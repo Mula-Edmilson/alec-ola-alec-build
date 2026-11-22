@@ -175,3 +175,56 @@ main.write_text(m, encoding="utf-8", newline="\n")
 (root / "audio.rs").write_text(a, encoding="utf-8", newline="\n")
 (root / "clap.rs").write_text(clap_code, encoding="utf-8", newline="\n")
 print("ALEC V3: detector de palmada dupla instalado no helper nativo.")
+
+
+# Teste de integração: o evento acústico passa à mesma sessão hands-free
+# utilizada pela activação por voz, mas não durante resposta do assistente.
+m = (root / "main.rs").read_text(encoding="utf-8")
+old_event = '''            Ev::DoubleClap => {
+                // Mesmo estado do despertar vocal: nao acorda enquanto ALEC responde.
+                if self.phase == Phase::Wake && self.wake_on && !self.wake_hold
+                    && alec_clap_enabled()
+                {
+                    log("wake: double clap detected; opening hands-free listening");
+                    self.listen_now(Some(8.0));
+                }
+            },
+'''
+m = once(m, old_event,
+         "            Ev::DoubleClap => self.alec_activate_clap(alec_clap_enabled()),\n",
+         "main.rs")
+clap_transition = r'''    fn alec_activate_clap(&mut self, enabled: bool) {
+        if enabled && self.phase == Phase::Wake && self.wake_on && !self.wake_hold {
+            log("wake: double clap detected; opening hands-free listening");
+            self.listen_now(Some(8.0));
+        }
+    }
+
+'''
+m = once(m, "    fn on_wake_text(&mut self, take: u64, text: String) {\n",
+         clap_transition + "    fn on_wake_text(&mut self, take: u64, text: String) {\n",
+         "main.rs")
+integration = r'''    #[test]
+    fn alec_palmada_dupla_ativa_handsfree_sem_falar() {
+        let (mut v, _jobs, wav) = voice();
+        v.alec_activate_clap(true);
+        assert_eq!(v.phase, Phase::Idle, "nao acorda com wake desligado");
+        v.handle(Ev::Cmd(json!({ "cmd": "wake", "on": true })));
+        v.tick();
+        assert_eq!(v.phase, Phase::Wake);
+        v.alec_activate_clap(false);
+        assert_eq!(v.phase, Phase::Wake, "precisa de autorizacao explicita");
+        v.alec_activate_clap(true);
+        assert_eq!(v.phase, Phase::HandsFree, "duas palmadas iniciam escuta sem ASR");
+        assert!(v.source.is_some(), "microfone aberto para comando de voz");
+        v.alec_activate_clap(true);
+        assert_eq!(v.phase, Phase::HandsFree, "sem activacoes repetidas");
+        let _ = std::fs::remove_file(wav);
+    }
+
+'''
+m = once(m, "    #[test]\n    fn the_wake_phrase_starts_a_hands_free_take_without_itself() {",
+         integration + "    #[test]\n    fn the_wake_phrase_starts_a_hands_free_take_without_itself() {",
+         "main.rs")
+(root / "main.rs").write_text(m, encoding="utf-8", newline="\n")
+print("Teste de integracao do evento DoubleClap adicionado.")
