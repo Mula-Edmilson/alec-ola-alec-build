@@ -1,4 +1,4 @@
-name: "ALEC - Compilar Ola Alec para Windows"
+name: "ALEC - Ola Alec e Palmada Dupla para Windows"
 
 on:
   push:
@@ -9,6 +9,8 @@ on:
       - "Restaurar-ALEC.ps1"
       - "Diagnosticar-ALEC.ps1"
       - "scripts/patch-ola-alec.py"
+      - "scripts/clap.rs"
+      - "Palmada-Dupla-ALEC.ps1"
   workflow_dispatch:
 
 permissions:
@@ -45,7 +47,7 @@ jobs:
           print('Versao verificada:', version)
           PYVERSION
 
-      - name: Aplicar patch de activacao ALEC V2 e diagnostico opt-in
+      - name: Aplicar patch ALEC V3 (voz e dupla palmada)
         shell: bash
         run: |
           set -euo pipefail
@@ -64,6 +66,8 @@ jobs:
         run: |
           set -euo pipefail
           cargo test --release --locked --manifest-path upstream/showcase/tauri/src-tauri/voice-win/Cargo.toml --target x86_64-pc-windows-msvc wake::tests -- --nocapture
+          cargo test --release --locked --manifest-path upstream/showcase/tauri/src-tauri/voice-win/Cargo.toml --target x86_64-pc-windows-msvc clap::tests -- --nocapture
+          cargo test --release --locked --manifest-path upstream/showcase/tauri/src-tauri/voice-win/Cargo.toml --target x86_64-pc-windows-msvc alec_palmada_dupla -- --nocapture
 
       - name: Compilar apenas roamies-voice.exe
         shell: bash
@@ -90,12 +94,15 @@ jobs:
           if (Test-Path -LiteralPath 'Diagnosticar-ALEC.ps1') {
             Copy-Item -LiteralPath 'Diagnosticar-ALEC.ps1' -Destination resultado/Diagnosticar-ALEC.ps1
           }
-          'ALEC V2: saudacoes portuguesas/inglesas e diagnostico local opt-in. Roamies 0.1.49 Windows x64.' | Set-Content -Path resultado/LEIA-ME.txt -Encoding utf8
+          if (Test-Path -LiteralPath 'Palmada-Dupla-ALEC.ps1') {
+            Copy-Item -LiteralPath 'Palmada-Dupla-ALEC.ps1' -Destination resultado/Palmada-Dupla-ALEC.ps1
+          }
+          'ALEC V3: Olá Alec, dupla palmada (audio local), controlo opt-in, diagnostico. Roamies 0.1.49 Windows x64.' | Set-Content -Path resultado/LEIA-ME.txt -Encoding utf8
 
       - name: Publicar ZIP do executavel
         uses: actions/upload-artifact@v4
         with:
-          name: "ALEC-Ola-Alec-Windows"
+          name: "ALEC-Ola-Alec-Palmada-Dupla-Windows"
           path: resultado/
           if-no-files-found: error
           retention-days: 7
