@@ -1,0 +1,94 @@
+name: "ALEC LAB - Modelos Livres Roamies 0.1.50"
+on:
+  push:
+    branches:
+      - "lab/modelos-livres-roamies-0150"
+    paths:
+      - ".github/workflows/lab-modelos-livres-0150.yml"
+      - "lab/**"
+  workflow_dispatch:
+permissions:
+  contents: read
+
+jobs:
+  verificar-laboratorio:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout do ramo de laboratorio
+        uses: actions/checkout@v4
+
+      - name: Codigo original fixado em v0.1.50
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth=1 --branch v0.1.50 https://github.com/KenKaiii/Roamies.git upstream
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          v = json.loads(Path("upstream/showcase/tauri/src-tauri/tauri.conf.json").read_text(encoding="utf8"))["version"]
+          assert v == "0.1.50", f"Versao inesperada: {v}"
+          print("Versao verificada: Roamies", v)
+          PY
+
+      - name: Validar fontes intactas e aplicar apenas ficheiros permitidos
+        shell: bash
+        run: |
+          set -euo pipefail
+          python lab/verificar_e_aplicar.py --source upstream --overrides lab/overrides --report resultado/manifesto.txt
+          git -C upstream diff --check
+          git -C upstream diff --name-only
+          node --check upstream/showcase/tauri/sidecar/local.mjs
+          node --check upstream/showcase/tauri/sidecar/alec-modelmode.mjs
+          node --check upstream/showcase/tauri/sidecar/sidekick.mjs
+          node --check upstream/showcase/tauri/sidecar/test/alec-modelmodes.test.mjs
+          node --check upstream/showcase/panel/panel.js
+
+      - name: Preparar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Instalar dependencias oficiais em ambiente descartavel
+        shell: pwsh
+        working-directory: upstream/showcase/tauri/sidecar
+        run: |
+          $ErrorActionPreference = 'Stop'
+          npm.cmd ci --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { throw "npm ci falhou" }
+
+      - name: Executar todos os testes existentes e os novos
+        shell: pwsh
+        working-directory: upstream/showcase/tauri/sidecar
+        run: |
+          $ErrorActionPreference = 'Stop'
+          npm.cmd test
+          if ($LASTEXITCODE -ne 0) { throw "npm test falhou" }
+
+      - name: Preparar relatorio e fonte modificada para revisao
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Path resultado/overrides -Force | Out-Null
+          Copy-Item -Path lab/overrides/showcase -Destination resultado/overrides -Recurse -Force
+          Copy-Item -LiteralPath lab/verificar_e_aplicar.py -Destination resultado/verificar_e_aplicar.py
+          Copy-Item -LiteralPath lab/README-LAB.md -Destination resultado/README-LAB.md
+          @"
+          ALEC MODELOS LIVRES - LABORATORIO (NAO INSTALAR EM PRODUCAO)
+          Origem: KenKaiii/Roamies v0.1.50
+          Destino: nenhuma instalacao local; ambiente GitHub Actions descartavel
+          Ficheiros alterados: sidecar/local.mjs, sidecar/sidekick.mjs,
+          painel panel.js, teste local.test.mjs.
+          Ficheiros novos: sidecar/alec-modelmode.mjs, teste alec-modelmodes.test.mjs
+          Testes Node: todos aprovados.
+          Voz: voice-win e os ficheiros do ALEC V3/V4/V5 nao foram alterados.
+          INSTALACAO EM WINDOWS: NAO EXECUTADA.
+          "@ | Set-Content -Path resultado/RELATORIO.txt -Encoding UTF8
+
+      - name: Publicar somente pacote de codigo LAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: "ALEC-Modelos-Livres-Roamies-0150-LAB"
+          path: resultado/
+          retention-days: 14
+          if-no-files-found: error
