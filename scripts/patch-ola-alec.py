@@ -197,6 +197,7 @@ clap_transition = r'''    fn alec_activate_clap(&mut self, enabled: bool) {
         if enabled && self.phase == Phase::Wake && self.wake_on && !self.wake_hold {
             log("wake: double clap detected; opening hands-free listening");
             self.listen_now(Some(8.0));
+            self.needs_voice = true; // Ignora o estalo restante; exige voz sustentada.
         }
     }
 
@@ -217,6 +218,7 @@ integration = r'''    #[test]
         v.alec_activate_clap(true);
         assert_eq!(v.phase, Phase::HandsFree, "duas palmadas iniciam escuta sem ASR");
         assert!(v.source.is_some(), "microfone aberto para comando de voz");
+        assert!(v.needs_voice, "uma palmada nao e interpretada como comando de voz");
         v.alec_activate_clap(true);
         assert_eq!(v.phase, Phase::HandsFree, "sem activacoes repetidas");
         let _ = std::fs::remove_file(wav);
