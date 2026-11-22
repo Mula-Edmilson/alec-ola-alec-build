@@ -1,0 +1,12 @@
+# Não publicar modelos privados ou gravações no repositório público.
+*.onnx
+*.onnx.data
+*.wav
+*.flac
+*.mp3
+*.m4a
+*.pt
+*.pth
+*.zip
+.venv/
+__pycache__/
