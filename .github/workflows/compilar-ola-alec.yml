@@ -1,4 +1,4 @@
-name: "ALEC V4 - Treino de Tres Palmadas para Windows"
+name: "ALEC V5 - Hello Alex openWakeWord para Windows"
 
 on:
   push:
@@ -14,6 +14,9 @@ on:
       - "Calibrar-Palmadas-ALEC.ps1"
       - "scripts/clap_learning.rs"
       - "scripts/patch-calibracao.py"
+      - "scripts/neuralwake.rs"
+      - "scripts/patch-openwakeword.py"
+      - "Instalar-Modelo-Hello-Alex.ps1"
   workflow_dispatch:
 
 permissions:
@@ -62,6 +65,12 @@ jobs:
           set -euo pipefail
           python scripts/patch-calibracao.py
 
+      - name: Integrar motor neural Hello Alex opcional
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/patch-openwakeword.py
+
       - name: Configurar Rust MSVC no servidor
         shell: pwsh
         run: |
@@ -74,16 +83,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo test --release --locked --manifest-path upstream/showcase/tauri/src-tauri/voice-win/Cargo.toml --target x86_64-pc-windows-msvc wake::tests -- --nocapture
-          cargo test --release --locked --manifest-path upstream/showcase/tauri/src-tauri/voice-win/Cargo.toml --target x86_64-pc-windows-msvc clap::tests -- --nocapture
-          cargo test --release --locked --manifest-path upstream/showcase/tauri/src-tauri/voice-win/Cargo.toml --target x86_64-pc-windows-msvc clap_learning::tests -- --nocapture
-          cargo test --release --locked --manifest-path upstream/showcase/tauri/src-tauri/voice-win/Cargo.toml --target x86_64-pc-windows-msvc alec_palmada_dupla -- --nocapture
+          cargo test --release --manifest-path upstream/showcase/tauri/src-tauri/voice-win/Cargo.toml --target x86_64-pc-windows-msvc wake::tests -- --nocapture
+          cargo test --release --manifest-path upstream/showcase/tauri/src-tauri/voice-win/Cargo.toml --target x86_64-pc-windows-msvc clap::tests -- --nocapture
+          cargo test --release --manifest-path upstream/showcase/tauri/src-tauri/voice-win/Cargo.toml --target x86_64-pc-windows-msvc clap_learning::tests -- --nocapture
+          cargo test --release --manifest-path upstream/showcase/tauri/src-tauri/voice-win/Cargo.toml --target x86_64-pc-windows-msvc alec_palmada_dupla -- --nocapture
+          cargo test --release --manifest-path upstream/showcase/tauri/src-tauri/voice-win/Cargo.toml --target x86_64-pc-windows-msvc alec_neural_wake -- --nocapture
+          cargo test --release --manifest-path upstream/showcase/tauri/src-tauri/voice-win/Cargo.toml --target x86_64-pc-windows-msvc neuralwake::tests -- --nocapture
 
       - name: Compilar apenas roamies-voice.exe
         shell: bash
         run: |
           set -euo pipefail
-          cargo build --release --locked --manifest-path upstream/showcase/tauri/src-tauri/voice-win/Cargo.toml --target x86_64-pc-windows-msvc
+          cargo build --release --manifest-path upstream/showcase/tauri/src-tauri/voice-win/Cargo.toml --target x86_64-pc-windows-msvc
 
       - name: Preparar executavel, versao e integridade
         shell: pwsh
@@ -110,12 +121,15 @@ jobs:
           if (Test-Path -LiteralPath 'Calibrar-Palmadas-ALEC.ps1') {
             Copy-Item -LiteralPath 'Calibrar-Palmadas-ALEC.ps1' -Destination resultado/Calibrar-Palmadas-ALEC.ps1
           }
-          'ALEC V4: grava tres pares de palmadas no microfone e guarda assinaturas numericas locais. Roamies 0.1.49 Windows x64.' | Set-Content -Path resultado/LEIA-ME.txt -Encoding utf8
+          if (Test-Path -LiteralPath 'Instalar-Modelo-Hello-Alex.ps1') {
+            Copy-Item -LiteralPath 'Instalar-Modelo-Hello-Alex.ps1' -Destination resultado/Instalar-Modelo-Hello-Alex.ps1
+          }
+          'ALEC V5: motor neural openWakeWord Hello Alex opcional. Palmadas desactivadas por defeito. Modelo treinado no Colab separadamente. Roamies 0.1.49 Windows x64.' | Set-Content -Path resultado/LEIA-ME.txt -Encoding utf8
 
       - name: Publicar ZIP do executavel
         uses: actions/upload-artifact@v4
         with:
-          name: "ALEC-V4-Palmadas-Aprendidas-Windows"
+          name: "ALEC-V5-Hello-Alex-Windows"
           path: resultado/
           if-no-files-found: error
           retention-days: 7
