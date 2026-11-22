@@ -531,7 +531,7 @@
   // The runnable models, one optgroup per signed-in provider, values 'provider:modelId'; `current` is the selected one ('' for none).
   // text: also the models that can't see images, in their own group per provider (subagents only).
   const modelOptgroups = (current, text = false) => state.providers.filter((p) => p.on).flatMap((p) => [
-    el('optgroup', { label: p.label }, p.models.map((m) => el('option', { value: `${p.id}:${m.id}`, textContent: p.id === 'local' ? `${m.name} · ${m.tools && m.vision ? 'Visão + tools' : 'Só conversa'}` : m.name, selected: `${p.id}:${m.id}` === current }))),
+    el('optgroup', { label: p.label }, p.models.map((m) => el('option', { value: `${p.id}:${m.id}`, textContent: p.id === 'local' ? `${m.name} · ${m.tools && m.vision ? 'Visão + tools' : m.tools ? 'Tools sem visão (conversa)' : m.vision ? 'Visão sem tools (conversa)' : 'Só texto (conversa)'}` : m.name, selected: `${p.id}:${m.id}` === current }))),
     text && p.textModels?.length ? el('optgroup', { label: `${p.label}, text only` },
       p.textModels.map((m) => el('option', { value: `${p.id}:${m.id}`, textContent: m.name, selected: `${p.id}:${m.id}` === current }))) : null,
   ].filter(Boolean));
