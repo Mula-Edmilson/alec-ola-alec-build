@@ -8,7 +8,7 @@ import { CONFIG_PATH, DATA_DIR, ROAMIES_DIR } from './datadir.mjs';
 import { Agent } from '@kenkaiiii/gg-agent';
 import { ClaudeCodeAgent, claudeCodeInstaller, closeSpare } from './claudecode.mjs';
 import { SAFE, checkDrawAction, checkLink, checkMcpCall, checkOpen, checkRead, checkWrite, isYes, redactArgs } from './safety.mjs';
-import { agentsRoot, createAgents, holdAfterLaunch, newsDesk, wantsAgent } from './agents.mjs';
+import { agentsRoot, createAgents, holdAfterLaunch, newsDesk, wantsAgent as wantsAgentBase } from './agents.mjs';
 import { agentEvents, stallWatch } from './agentstream.mjs';
 import { CATALOG_PROVIDERS, createCatalogs } from './catalogs.mjs';
 import {
@@ -500,6 +500,8 @@ async function removeServer(id) {
 // Some models run on only one kind of key (Kimi K2.8 Preview on a Kimi Code plan key, MiMo UltraSpeed on API Credits).
 const canRun = (p, id) => !!signedIn.get(p) && (p === 'local' || seesImages(p, id)) && getAuthStorageKeys(p, id).some((k) => k === p || storedKeys.has(k));
 const chatOnlyNow = () => conversationOnly(config.provider, getModel(config.model));
+// Conserva o contrato original do prompt; no modo conversa nunca se solicita um agente externo.
+const wantsAgent = (text) => !chatOnlyNow() && wantsAgentBase(text);
 const runnable = (p) => getModelsForProvider(p).filter((m) => canRun(p, m.id));
 // Subagents may run on a model that can't see images: they work from a written brief, and pictures are left out.
 const canRunText = (p, id) => !!signedIn.get(p) && getModelsForProvider(p).some((m) => m.id === id && (p !== 'local' || m.supportsTools === true)) && getAuthStorageKeys(p, id).some((k) => k === p || storedKeys.has(k));
@@ -1465,10 +1467,9 @@ async function prompt(text, image = null, note = '', byVoice = false, news = nul
   agent.setSignal(controller.signal);
   // "Send an agent to…": the agents' corner hatches one instead of the thought cloud while the brief is written.
   const agentish = !intro && !news && wantsAgent(text);
-  const canHatch = agentish && !chatOnlyNow();
   turnImage = image;
-  ui({ kind: 'agent', e: { type: 'start', ...(canHatch ? { agentish: true } : {}) } });
-  let hatching = canHatch;
+  ui({ kind: 'agent', e: { type: 'start', ...(agentish ? { agentish: true } : {}) } });
+  let hatching = agentish;
   const hatchOff = () => { if (hatching) { hatching = false; ui({ kind: 'agents', e: { type: 'hatch_off' } }); } };
   // Voice: the socket opens now, while the model thinks; sentences are spoken as soon as each is ready.
   const voice = VOICE_ON() ? speech.start() : (speech.stop(), null);
@@ -1514,10 +1515,10 @@ async function prompt(text, image = null, note = '', byVoice = false, news = nul
     if (brief) { config.briefDay = brief.day; saveConfig(); logLine('brief', { todoist: !!config.briefTodoist && HANDS_OK }); }
     const onScreen = [takeQuizNote(), ink.listNote()].filter(Boolean).join(' '); // a quiz's score, lists changed on their cards
     // They spoke first: untold news rides along with their message, so it's never announced separately afterwards.
-    const along = desk.along(text, { intro: !!intro, news: !!news, agentish: canHatch });
+    const along = desk.along(text, { intro: !!intro, news: !!news, agentish });
     const stamped = `[${stampNow()}] ${text}${onScreen ? `\n(${onScreen})` : ''}${along}`;
-    const nudge = !canHatch && !intro && !news && !handoff ? delegateNote(text, crewNow(), config.delegate) : '';
-    const toAgent = canHatch ? `${stamped}\n(They asked for an agent: call send_agent.)` : nudge ? `${stamped}\n${nudge}` : stamped;
+    const nudge = !agentish && !intro && !news && !handoff ? delegateNote(text, crewNow(), config.delegate) : '';
+    const toAgent = agentish ? `${stamped}\n(They asked for an agent: call send_agent.)` : nudge ? `${stamped}\n${nudge}` : stamped;
     const asked = handoff ? `${toAgent}\n${handoffNote({ userName, assistant: lookName(), reason: handoff.reason, from: handoff.from, kind: handoff.kind, words: turnWords, untilText: handoff.untilText, because: handoff.because, fix: handoff.fix })}` : toAgent;
     const sent = brief ? `${asked}\n(${brief.note})` : asked;
     // An area snap rides along as an image in the same message.
@@ -1530,7 +1531,7 @@ async function prompt(text, image = null, note = '', byVoice = false, news = nul
     // and say so, instead of waiting silently forever with every later request queued behind it.
     // An agent request's words wait until it's clear whether an agent launched: then they're dropped (the launch is
     // the reply); otherwise they show as usual. Once any agent launches, the rest of the request's words are dropped.
-    let hold = canHatch ? '' : null, launched = false;
+    let hold = agentish ? '' : null, launched = false;
     const release = () => {
       if (hold == null) return;
       const h = hold; hold = null; hatchOff();
