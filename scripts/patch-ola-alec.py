@@ -124,3 +124,54 @@ m = once(
 wake.write_text(w, encoding="utf-8", newline="\n")
 main.write_text(m, encoding="utf-8", newline="\n")
 print("Patch V2 aplicado: variantes de fala e diagnostico opt-in.")
+
+
+# ALEC Double Clap V1: a detecção de som corre em PCM, antes do ASR.
+# Não é uma "wake word" no painel; o som actua como segundo gatilho,
+# activo apenas quando existe o marcador local alec-double-clap.flag.
+a = (root / "audio.rs").read_text(encoding="utf-8")
+clap_code = Path("scripts/clap.rs").read_text(encoding="utf-8")
+if "pub struct DoubleClap" not in clap_code:
+    raise RuntimeError("Modulo de deteccao de palmadas incompleto.")
+
+m = once(m, "mod audio;\n", "mod audio;\nmod clap;\n", "main.rs")
+m = once(m, "pub enum Ev {\n", "pub enum Ev {\n    DoubleClap,\n", "main.rs")
+clap_enabled = r'''
+// Duas palmadas sao opcionais e processadas 100% neste computador.
+// Apos instalar V3, o instalador activa a funcionalidade com este ficheiro.
+fn alec_clap_enabled() -> bool {
+    std::env::var_os("USERPROFILE")
+        .is_some_and(|home|
+            PathBuf::from(home).join("Roamies").join("Data")
+                .join("alec-double-clap.flag").is_file())
+}
+
+'''
+m = once(m, "pub enum Ev {", clap_enabled + "pub enum Ev {", "main.rs")
+event = r'''            Ev::DoubleClap => {
+                // Mesmo estado do despertar vocal: nao acorda enquanto ALEC responde.
+                if self.phase == Phase::Wake && self.wake_on && !self.wake_hold
+                    && alec_clap_enabled()
+                {
+                    log("wake: double clap detected; opening hands-free listening");
+                    self.listen_now(Some(8.0));
+                }
+            },
+'''
+m = once(m, "        match ev {\n            Ev::Cmd(msg) =>",
+         "        match ev {\n" + event + "            Ev::Cmd(msg) =>", "main.rs")
+
+a = once(a, "    out: Vec<f32>,\n",
+         "    out: Vec<f32>,\n    clap: crate::clap::DoubleClap,\n", "audio.rs")
+a = once(a, "Sink { buf, tx, resampler: None, channels: 1, mono: Vec::new(), out: Vec::new() }",
+         "Sink { buf, tx, resampler: None, channels: 1, mono: Vec::new(), out: Vec::new(), clap: crate::clap::DoubleClap::default() }", "audio.rs")
+a = once(a, "        self.buf.lock().unwrap().extend_from_slice(&self.out);\n        let _ = self.tx.send(Ev::Level(level));",
+         "        let double_clap = self.clap.feed(&self.out);\n"
+         "        self.buf.lock().unwrap().extend_from_slice(&self.out);\n"
+         "        let _ = self.tx.send(Ev::Level(level));\n"
+         "        if double_clap { let _ = self.tx.send(Ev::DoubleClap); }", "audio.rs")
+
+main.write_text(m, encoding="utf-8", newline="\n")
+(root / "audio.rs").write_text(a, encoding="utf-8", newline="\n")
+(root / "clap.rs").write_text(clap_code, encoding="utf-8", newline="\n")
+print("ALEC V3: detector de palmada dupla instalado no helper nativo.")
