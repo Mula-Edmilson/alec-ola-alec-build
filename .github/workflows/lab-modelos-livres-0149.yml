@@ -139,6 +139,35 @@ jobs:
           if (@(Compare-Object $files $expected).Count -ne 0) { throw 'Pacote contem ficheiros inesperados ou em falta' }
           Write-Host 'Pacote validado. Nenhum executavel, voz ou pasta de memoria incluido.'
 
+      - name: Testar INSTALAR / RESTAURAR / BLOQUEAR numa instalacao ficticia
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $sandbox = Join-Path $env:RUNNER_TEMP 'ALEC-Roamies-0149-Tutorial'
+          $sidecar = Join-Path $sandbox 'sidecar'
+          New-Item -ItemType Directory -Path $sidecar -Force | Out-Null
+          $exe = Join-Path $sandbox 'Roamies.exe'
+          [IO.File]::WriteAllBytes($exe, [byte[]]@(0))
+          $target = Join-Path $sidecar 'sidekick.mjs'
+          Copy-Item -LiteralPath compilacao/original-sidekick.mjs -Destination $target -Force
+          $voice = Join-Path $sandbox 'roamies-voice.exe'
+          [IO.File]::WriteAllText($voice, 'NAO ALTERAR A VOZ')
+          $voiceBefore = (Get-FileHash -LiteralPath $voice -Algorithm SHA256).Hash
+          $script = (Resolve-Path 'resultado/Instalar-Modelos-Livres-0149.ps1').Path
+          $m = Get-Content -LiteralPath resultado/MANIFESTO.json -Raw | ConvertFrom-Json
+          & $script -Acao Estado -Instalacao $sandbox
+          & $script -Acao Instalar -Instalacao $sandbox
+          if ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant() -ne $m.patchedSha256) { throw 'Instalacao de teste nao aplicada' }
+          if ((Get-FileHash -LiteralPath $voice -Algorithm SHA256).Hash -ne $voiceBefore) { throw 'O teste modificou a voz!' }
+          & $script -Acao Restaurar -Instalacao $sandbox
+          if ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant() -ne $m.originalSha256) { throw 'Restauracao de teste falhou' }
+          [IO.File]::WriteAllText($target, 'personalizacao existente e desconhecida')
+          $blocked = $false
+          try { & $script -Acao Instalar -Instalacao $sandbox } catch { $blocked = $true }
+          if (-not $blocked) { throw 'Risco: instalador nao bloqueou um ficheiro desconhecido!' }
+          if ([IO.File]::ReadAllText($target) -ne 'personalizacao existente e desconhecida') { throw 'O patch apagou uma personalizacao!' }
+          Write-Host 'PowerShell: instalacao, restauracao, bloqueio e preservacao de voz aprovados!'
+
       - name: Publicar apenas patch PowerShell sem instalador Roamies
         uses: actions/upload-artifact@v4
         with:
