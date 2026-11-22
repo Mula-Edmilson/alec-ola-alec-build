@@ -77,21 +77,12 @@ try {
         Copy-Item -LiteralPath $backup -Destination $original -Force
         throw
     }
-    # Funcionalidade solicitada: ao instalar o helper V3, ativa a palmada dupla.
-    # Pode ser desativada em qualquer momento com Palmada-Dupla-ALEC.ps1.
-    $clapDir = Join-Path $env:USERPROFILE 'Roamies\Data'
-    $clapFlag = Join-Path $clapDir 'alec-double-clap.flag'
-    try {
-        New-Item -ItemType Directory -Path $clapDir -Force | Out-Null
-        [IO.File]::WriteAllText($clapFlag, 'on')
-        Write-Host 'PALMADA DUPLA ativada (dois estalos secos com intervalo de 0,2 a 0,5 s).' -ForegroundColor Green
-    } catch {
-        Write-Host "AVISO: palmada dupla nao ativada automaticamente: $($_.Exception.Message)" -ForegroundColor Yellow
-        Write-Host 'Usa Palmada-Dupla-ALEC.ps1 -Acao Ativar.'
-    }
-    Write-Host 'SUCESSO! Ativacao "Ola Alec" e deteccao de palmada dupla instaladas.' -ForegroundColor Green
+    # A activacao por palmadas foi retirada da configuracao por defeito;
+    # esta versao privilegia um modelo neural de frase, instalado separadamente.
+    Remove-Item -LiteralPath (Join-Path $env:USERPROFILE 'Roamies\Data\alec-double-clap.flag') -Force -ErrorAction SilentlyContinue
+    Write-Host 'SUCESSO! Helper ALEC V5 instalado. Palmada dupla desativada por seguranca.' -ForegroundColor Green
     Write-Host 'Abre o Roamies > Listening > Hands-free > Wake word = ON.'
-    Write-Host 'Diz: "Ola Alec, que horas sao?"'
+    Write-Host 'Quando instalares hello_alex.onnx, diz "Hello Alex" e depois o comando.'
     Write-Host "Backup: $backup"
     Write-Host 'Atualizacoes automaticas podem repor o helper original.'
 } catch {
