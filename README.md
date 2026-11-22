@@ -63,3 +63,21 @@ Para desligar o diagnóstico sem apresentar transcrições:
 ```
 
 O sinalizador usado é `%USERPROFILE%\Roamies\Data\alec-wake-debug.flag`. Não há envio dessas transcrições pelo diagnóstico para a nuvem.
+
+## ALEC V3 — Acordar com duas palmadas rápidas
+
+A partir da revisão V3, o componente nativo reconhece **duas palmadas distintas**, separadas por aproximadamente **0,16 a 0,70 segundos**. O detector analisa a energia, o início abrupto e o conteúdo de altas frequências do áudio no próprio computador. Não depende de uma frequência fixa, de um novo modelo de IA, de internet ou de transcrição de voz.
+
+**A activação por voz continua a funcionar**: «Olá Alec», «Hello Alex» e a saudação definida no painel. A palmada dupla apenas funciona quando **Listening → Hands-free → Wake word** está activo, o microfone está disponível e o assistente não está a responder. Uma sequência detectada abre a escuta hands-free para dizeres o comando **depois** das palmadas.
+
+O instalador V3 activa automaticamente a palmada dupla e cria o marcador local `%USERPROFILE%\Roamies\Data\alec-double-clap.flag`. Podes controlar a opção no PowerShell com o ficheiro `Palmada-Dupla-ALEC.ps1` incluído no ZIP:
+
+```powershell
+& ".\Palmada-Dupla-ALEC.ps1" -Acao Estado
+& ".\Palmada-Dupla-ALEC.ps1" -Acao Ativar
+& ".\Palmada-Dupla-ALEC.ps1" -Acao Desativar
+```
+
+**Como testar:** começa num local relativamente silencioso. Faz duas palmadas secas, com ~0,3 segundos de intervalo. Assim que o Roamies mostrar a escuta activa, diz «Que horas são?». Pode ser necessário ajustar a sensibilidade ao microfone real: os testes automáticos utilizam sons sintetizados e não garantem que todas as palmadas sejam reconhecidas. Sons parecidos — como duas batidas fortes ou música — também podem provocar falsos positivos. Se isso ocorrer, desactiva com o comando acima.
+
+A implementação acrescenta apenas processamento acústico leve no helper `roamies-voice.exe`; **não descarrega nem carrega modelos adicionais na RAM**. Todo o código do detector e os seus testes estão em `scripts/clap.rs`, e a integração em `scripts/patch-ola-alec.py`.
