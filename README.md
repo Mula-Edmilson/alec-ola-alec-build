@@ -81,3 +81,33 @@ O instalador V3 activa automaticamente a palmada dupla e cria o marcador local `
 **Como testar:** começa num local relativamente silencioso. Faz duas palmadas secas, com ~0,3 segundos de intervalo. Assim que o Roamies mostrar a escuta activa, diz «Que horas são?». Pode ser necessário ajustar a sensibilidade ao microfone real: os testes automáticos utilizam sons sintetizados e não garantem que todas as palmadas sejam reconhecidas. Sons parecidos — como duas batidas fortes ou música — também podem provocar falsos positivos. Se isso ocorrer, desactiva com o comando acima.
 
 A implementação acrescenta apenas processamento acústico leve no helper `roamies-voice.exe`; **não descarrega nem carrega modelos adicionais na RAM**. Todo o código do detector e os seus testes estão em `scripts/clap.rs`, e a integração em `scripts/patch-ola-alec.py`.
+
+## ALEC V4 — Palmada dupla aprendida (três gravações)
+
+A partir da V4, a deteção de palmadas pode aprender o **ritmo e as características acústicas de três exemplos gravados no teu microfone**. Isto não é identificação biométrica nem um mecanismo de segurança: é um gatilho acústico de conveniência e poderá despertar por sons parecidos.
+
+**A sequência de calibração:**
+
+1. Instala o ZIP da compilação V4 utilizando `Instalar-ALEC-Compilado.ps1`.
+2. **Fecha completamente o Roamies** (incluindo o ícone da bandeja). O assistente de calibração usa o microfone predefinido do Windows.
+3. Na pasta extraída, executa:
+
+```powershell
+Unblock-File ".\Calibrar-Palmadas-ALEC.ps1"
+& ".\Calibrar-Palmadas-ALEC.ps1" -Acao Gravar
+```
+
+4. O assistente pede **três exemplos**, um de cada vez. Em cada exemplo carrega Enter e faz **duas palmadas** no intervalo de captura.
+5. O ALEC extrai o intervalo entre os dois sons, características de frequências altas, picos e proporção de intensidade. São guardados apenas estes números em `%USERPROFILE%\Roamies\Data\alec-clap-profile.json`. **Nenhum áudio bruto é guardado.**
+6. Reabre o Roamies e mantém `Listening → Hands-free → Wake word` ligado. Faz duas palmadas; quando a escuta abrir, diz o teu comando normalmente.
+
+A partir daí o detector compara os sons com **os três modelos** que gravaste. Não adiciona outros modelos de IA nem necessita de internet. Se não houver perfil, continua disponível a heurística V3.
+
+**Ver estado ou apagar o perfil:**
+
+```powershell
+& ".\Calibrar-Palmadas-ALEC.ps1" -Acao Estado
+& ".\Calibrar-Palmadas-ALEC.ps1" -Acao Apagar
+```
+
+A calibração melhora a personalização, mas não garante 100% de reconhecimento. A acústica da sala, a distância e o microfone podem exigir que repitas as três gravações. Para desligar totalmente a palmada dupla, usa `Palmada-Dupla-ALEC.ps1 -Acao Desativar`. A activação «Olá Alec» continua activa independentemente disso.
