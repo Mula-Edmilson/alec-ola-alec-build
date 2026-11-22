@@ -531,7 +531,7 @@ let retryInfo = null; // a request being retried on the next model after a limit
 let retryNext = null;
 // The subagents that can be handed work now: the models picked for them, else hybrid's for their kind of job.
 const crewNow = () => (config.subagents && !chatOnlyNow() ? activeCrew(config.crew, crewSpec, hybridActive() ? config.heavy : null) : []);
-const hybridActive = () => !!config.hybrid && hybridOn(config.heavy);
+const hybridActive = () => !!config.hybrid && !chatOnlyNow() && hybridOn(config.heavy);
 const runnableSpec = (p, id) => (p !== 'local' || (getModel(id)?.supportsTools === true && getModel(id)?.supportsImages === true))
   && (canRun(p, id) || (p === 'local' && !!signedIn.get('local') && !!parseLocalModelId(id ?? '')));
 const crewSpec = (p, id) => runnableSpec(p, id) || (canRunText(p, id) && getModel(id)?.supportsTools === true);
@@ -541,7 +541,7 @@ const defaultSpecPick = () => { const d = defaultPick ?? { provider: config.prov
 /** The default, then the backups they set, in order: the models a request falls back through. */
 function chainOrder() {
   const out = [defaultSpecPick()];
-  if (config.backups) (config.fallbacks ?? []).slice(0, 2).forEach((s, i) => { const h = parseSpec(s); if (h && runnableSpec(h.provider, h.model)) out.push(pickOf(h.provider, h.model, `backup${i + 1}`)); });
+  if (config.backups && !chatOnlyNow()) (config.fallbacks ?? []).slice(0, 2).forEach((s, i) => { const h = parseSpec(s); if (h && runnableSpec(h.provider, h.model)) out.push(pickOf(h.provider, h.model, `backup${i + 1}`)); });
   return out;
 }
 const slotOf = (spec) => chainOrder().find((c) => c.spec === spec)?.slot ?? JOB_KINDS.find((j) => parseSpec(config.heavy?.[j.kind])?.spec === spec)?.kind ?? null;
@@ -584,7 +584,7 @@ function routeForTurn(text) {
   const dflt = defaultSpecPick(), prev = routed?.spec ?? dflt.spec, prevSlot = routed?.slot ?? 'default';
   turnNamed = null;
   let want = null, why = null, kindLabel = '';
-  if (!system && config.hybrid) {
+  if (!system && config.hybrid && !chatOnlyNow()) {
     const named = findModelMention(t, candidates(), defaultsByProvider());
     if (named && named.spec !== dflt.spec) { want = pickOf(named.provider, named.model, null); why = 'named'; turnNamed = want; }
   }
@@ -1507,7 +1507,7 @@ async function prompt(text, image = null, note = '', byVoice = false, news = nul
     const use = { t: Date.now(), model: config.model, calls: 0, tools: 0, in: 0, cacheRead: 0, cacheWrite: 0, out: 0 };
     learn = { ok: 0, bad: 0, saved: false }; // for the skill pass: tools that worked, ones that failed
     const soon = frontSoon; frontSoon = null;
-    frontNow = chatOnlyNow() ? null : await frontWithin(soon && Date.now() - soon.at < 8000 ? soon.p : whereNow());
+    frontNow = chatOnlyNow() ? '' : await frontWithin(soon && Date.now() - soon.at < 8000 ? soon.p : whereNow());
     // The first spoken request of the day carries the morning briefing (brief.mjs).
     const brief = intro ? null : briefNote({ on: !!config.morningBrief, lastDay: config.briefDay, byVoice, todoist: !!config.briefTodoist, canRead: HANDS_OK, name: userName });
     if (brief) { config.briefDay = brief.day; saveConfig(); logLine('brief', { todoist: !!config.briefTodoist && HANDS_OK }); }
