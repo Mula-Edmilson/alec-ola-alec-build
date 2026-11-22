@@ -1,0 +1,61 @@
+ALEC — MODELOS LIVRES PARA ROAMIES 0.1.49 (POWERSHELL)
+======================================================
+
+Este pacote NAO instala/actualiza Roamies.
+Só altera UM ficheiro do agente: sidecar\sidekick.mjs.
+NÃO substitui roamies-voice.exe, Fish Audio, Hello Alec, memoria, ficheiros
+pessoais, Roamies.exe, panel, TTS, configuracoes ou base de dados.
+
+ANTES DE COMEÇAR
+- Fecha completamente o Roamies, incluindo o icon da bandeja do Windows.
+- Descomprime os quatro ficheiros ZIP na mesma pasta.
+- O instalador só aceita a versão 0.1.49 e SHA256 EXACTO do sidekick original.
+- Se tiveres personalizado sidekick.mjs, o instalador RECUSA substituir.
+- Uma verificação/recusa nao altera a instalacao.
+
+POWERSHELL — VERIFICAR
+  Unblock-File ".\Instalar-Modelos-Livres-0149.ps1"
+  & ".\Instalar-Modelos-Livres-0149.ps1" -Acao Estado
+
+POWERSHELL — INSTALAR
+  & ".\Instalar-Modelos-Livres-0149.ps1" -Acao Instalar
+
+POWERSHELL — RESTAURAR O ORIGINAL
+  & ".\Instalar-Modelos-Livres-0149.ps1" -Acao Restaurar
+
+SE O ROAMIES ESTIVER INSTALADO NOUTRA PASTA
+  & ".\Instalar-Modelos-Livres-0149.ps1" -Acao Estado -Instalacao "C:\CAMINHO\Roamies"
+
+O QUE MUDA?
+- Modelos locais Ollama/LM Studio sem visão ou tools passam a aparecer.
+- Modelos sem ambas capacidades usam modo CONVERSA: sem chamadas de
+  ferramentas, sem pedidos de imagem/ecrã; ainda há respostas de texto.
+- Modelo local com visão E ferramentas conserva o modo completo.
+- Os modelos de conversa são assinalados com "· conversa" no selector.
+- O histórico textual e até cinco factos memorizados entram no contexto.
+- Não é necessário executar mais do que um LLM.
+- Não adiciona um serviço pago nem pede API key externa.
+
+LIMITACOES
+- Testes automatizados verificam estrutura, lógica e regressões no Windows,
+  mas não comprovam resultados com todos os modelos GGUF/Ollama locais.
+- A versão modificada depende da compatibilidade do modelo/servidor com
+  o protocolo de conversação de @kenkaiiii/gg-agent.
+- Em caso de falha de reconhecimento do ficheiro original, ABORTA. Não
+  uses -Force ou substituicoes manuais: envia o diagnóstico para análise.
+- O Roamies 0.1.50 NÃO é aceite por este pacote.
+- Depois de instalar, é necessário reiniciar o Roamies.
+
+INTEGRIDADE
+- MANIFESTO.json: hashes SHA256 do ficheiro original e alterado.
+- Backups: %USERPROFILE%\Roamies\Backups\ALEC-ModelosLivres-0149\
+- O instalador verifica o backup antes de escrever e confirma o hash depois.
+- Para restaurar, exige que o sidekick ainda seja exactamente o patch instalado.
+
+FONTE DO PROJETO
+  https://github.com/Mula-Edmilson/alec-ola-alec-build/tree/lab/modelos-livres-0149-powershell
+  https://github.com/KenKaiii/Roamies/tree/v0.1.49
+
+IMPORTANTE: a compatibilidade do motor de voz personalizado e comprovada
+pela NAO ALTERACAO do seu binario/fonte. Ainda assim, testar depois de
+instalar para validar o comportamento do conjunto, com rollback disponível.
