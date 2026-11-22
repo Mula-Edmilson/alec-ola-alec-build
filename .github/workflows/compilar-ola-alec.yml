@@ -1,4 +1,4 @@
-name: "ALEC - Ola Alec e Palmada Dupla para Windows"
+name: "ALEC V4 - Treino de Tres Palmadas para Windows"
 
 on:
   push:
@@ -11,6 +11,9 @@ on:
       - "scripts/patch-ola-alec.py"
       - "scripts/clap.rs"
       - "Palmada-Dupla-ALEC.ps1"
+      - "Calibrar-Palmadas-ALEC.ps1"
+      - "scripts/clap_learning.rs"
+      - "scripts/patch-calibracao.py"
   workflow_dispatch:
 
 permissions:
@@ -53,6 +56,12 @@ jobs:
           set -euo pipefail
           python scripts/patch-ola-alec.py
 
+      - name: Integrar treino de palmadas com três exemplos
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/patch-calibracao.py
+
       - name: Configurar Rust MSVC no servidor
         shell: pwsh
         run: |
@@ -67,6 +76,7 @@ jobs:
           set -euo pipefail
           cargo test --release --locked --manifest-path upstream/showcase/tauri/src-tauri/voice-win/Cargo.toml --target x86_64-pc-windows-msvc wake::tests -- --nocapture
           cargo test --release --locked --manifest-path upstream/showcase/tauri/src-tauri/voice-win/Cargo.toml --target x86_64-pc-windows-msvc clap::tests -- --nocapture
+          cargo test --release --locked --manifest-path upstream/showcase/tauri/src-tauri/voice-win/Cargo.toml --target x86_64-pc-windows-msvc clap_learning::tests -- --nocapture
           cargo test --release --locked --manifest-path upstream/showcase/tauri/src-tauri/voice-win/Cargo.toml --target x86_64-pc-windows-msvc alec_palmada_dupla -- --nocapture
 
       - name: Compilar apenas roamies-voice.exe
@@ -97,12 +107,15 @@ jobs:
           if (Test-Path -LiteralPath 'Palmada-Dupla-ALEC.ps1') {
             Copy-Item -LiteralPath 'Palmada-Dupla-ALEC.ps1' -Destination resultado/Palmada-Dupla-ALEC.ps1
           }
-          'ALEC V3: Olá Alec, dupla palmada (audio local), controlo opt-in, diagnostico. Roamies 0.1.49 Windows x64.' | Set-Content -Path resultado/LEIA-ME.txt -Encoding utf8
+          if (Test-Path -LiteralPath 'Calibrar-Palmadas-ALEC.ps1') {
+            Copy-Item -LiteralPath 'Calibrar-Palmadas-ALEC.ps1' -Destination resultado/Calibrar-Palmadas-ALEC.ps1
+          }
+          'ALEC V4: grava tres pares de palmadas no microfone e guarda assinaturas numericas locais. Roamies 0.1.49 Windows x64.' | Set-Content -Path resultado/LEIA-ME.txt -Encoding utf8
 
       - name: Publicar ZIP do executavel
         uses: actions/upload-artifact@v4
         with:
-          name: "ALEC-Ola-Alec-Palmada-Dupla-Windows"
+          name: "ALEC-V4-Palmadas-Aprendidas-Windows"
           path: resultado/
           if-no-files-found: error
           retention-days: 7
