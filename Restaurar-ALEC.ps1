@@ -33,6 +33,7 @@ try {
         (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash) {
         throw 'Verificacao do backup reposto falhou.'
     }
+    Remove-Item -LiteralPath (Join-Path $env:USERPROFILE 'Roamies\Data\alec-double-clap.flag') -Force -ErrorAction SilentlyContinue
     Write-Host 'Executavel de voz original restaurado. O Fish Audio permanece inalterado.' -ForegroundColor Green
 } catch {
     Write-Host "ERRO: $($_.Exception.Message)" -ForegroundColor Red
