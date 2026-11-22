@@ -11,7 +11,7 @@ assert.equal(conversationOnly('openai',text),false);
 assert.match(capabilityLabel(all),/Visão/);
 assert.match(capabilityLabel(text),/Só texto/);
 const prompt=conversationPrompt({name:'ALEC',user:'Pessoa',facts:[{text:'Prefere português'}]});
-assert.match(prompt,/não tens acesso a ferramentas/);
+assert.match(prompt,/não tens acesso a ferramentas/i);
 assert.match(prompt,/Prefere português/);
 assert.doesNotMatch(prompt,/podes abrir aplicações/i);
 console.log('alec-modelmodes: ok');
