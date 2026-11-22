@@ -1,0 +1,148 @@
+name: "ALEC 0.1.49 - Modelos Livres PowerShell (um ficheiro)"
+on:
+  push:
+    branches:
+      - "lab/modelos-livres-0149-powershell"
+    paths:
+      - ".github/workflows/lab-modelos-livres-0149.yml"
+      - "lab/0149/**"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  testar-empacotar:
+    runs-on: windows-latest
+    timeout-minutes: 65
+    steps:
+      - name: Checkout somente da branch de laboratorio
+        uses: actions/checkout@v4
+
+      - name: Clonar Roamies 0.1.49 oficial
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch v0.1.49 https://github.com/KenKaiii/Roamies.git upstream
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          assert json.loads(Path("upstream/showcase/tauri/src-tauri/tauri.conf.json").read_text())["version"] == "0.1.49"
+          print("Roamies oficial 0.1.49 confirmado.")
+          PY
+
+      - name: Instalar apenas dependencias Node do codigo original
+        shell: pwsh
+        working-directory: upstream/showcase/tauri/sidecar
+        run: |
+          $ErrorActionPreference = 'Stop'
+          npm.cmd ci --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { throw "Falha em npm ci" }
+
+      - name: Gerar bundle ORIGINAL e registar SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd upstream/showcase/tauri/sidecar
+          bash bundle.sh
+          mkdir -p ../../../../compilacao
+          cp dist/sidekick.mjs ../../../../compilacao/original-sidekick.mjs
+          cp dist/agentrun.mjs ../../../../compilacao/original-agentrun.mjs
+          sha256sum dist/sidekick.mjs
+
+      - name: Aplicar overrides controlados ao clone descartavel
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,subprocess
+          from pathlib import Path
+          root=Path("upstream")
+          originals={
+            "showcase/tauri/sidecar/local.mjs":"69d0fdd4e1baa2a2cab646f95bbab92aa93ea9cf",
+            "showcase/tauri/sidecar/sidekick.mjs":"1afdc4687bce3d01ccd923101a82b8f2ecf5be07",
+            "showcase/tauri/sidecar/test/local.test.mjs":"0c065a24756033890273ed6e27507a479c9bee72",
+          }
+          additions={"showcase/tauri/sidecar/alec-modelmode.mjs","showcase/tauri/sidecar/test/alec-modelmode.test.mjs"}
+          assert subprocess.check_output(["git","-C","upstream","describe","--exact-match","--tags","HEAD"],text=True).strip()=="v0.1.49"
+          assert not subprocess.check_output(["git","-C","upstream","status","--porcelain"],text=True).strip()
+          for rel,sha in originals.items():
+            assert subprocess.check_output(["git","-C","upstream","hash-object",rel],text=True).strip()==sha,rel
+          source=Path("lab/0149/overrides")
+          actual={p.relative_to(source).as_posix() for p in source.rglob("*") if p.is_file()}
+          assert actual==set(originals)|additions,actual
+          for rel in additions: assert not (root/rel).exists()
+          for rel in sorted(actual):
+            (root/rel).parent.mkdir(parents=True,exist_ok=True)
+            (root/rel).write_bytes((source/rel).read_bytes())
+          diff=set(subprocess.check_output(["git","-C","upstream","diff","--name-only"],text=True).splitlines())
+          assert diff==set(originals),(diff,set(originals))
+          print("SO sidecar alterado; nenhum ficheiro de voz, interface Tauri ou Fish Audio.")
+          PY
+          git -C upstream diff --check
+          node --check upstream/showcase/tauri/sidecar/local.mjs
+          node --check upstream/showcase/tauri/sidecar/sidekick.mjs
+          node --check upstream/showcase/tauri/sidecar/alec-modelmode.mjs
+
+      - name: Executar bateria COMPLETA de testes Roamies 0.1.49
+        shell: pwsh
+        working-directory: upstream/showcase/tauri/sidecar
+        run: |
+          $ErrorActionPreference = 'Stop'
+          npm.cmd test
+          if ($LASTEXITCODE -ne 0) { throw "Bateria de testes falhou" }
+
+      - name: Gerar bundle modificado, comparando ficheiros adicionais
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd upstream/showcase/tauri/sidecar
+          bash bundle.sh
+          cmp dist/agentrun.mjs ../../../../compilacao/original-agentrun.mjs
+          node --check dist/sidekick.mjs
+          mkdir -p ../../../../resultado
+          cp dist/sidekick.mjs ../../../../resultado/sidekick-ALEC-modelos.mjs
+          python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          base=Path("../../../../compilacao/original-sidekick.mjs")
+          patched=Path("../../../../resultado/sidekick-ALEC-modelos.mjs")
+          h=lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
+          assert h(base)!=h(patched), "Nao houve alteracao no bundle"
+          assert patched.stat().st_size>200_000
+          manifest={
+            "version":"0.1.49",
+            "scope":"sidecar/sidekick.mjs",
+            "originalSha256":h(base),
+            "patchedSha256":h(patched),
+            "source":"KenKaiii/Roamies v0.1.49",
+            "description":"Modelos locais de conversa sem tools e sem vision; motor de voz intacto",
+          }
+          Path("../../../../resultado/MANIFESTO.json").write_text(json.dumps(manifest,indent=2),encoding="utf-8")
+          print("ORIGINAL:",manifest["originalSha256"])
+          print("PATCH:",manifest["patchedSha256"])
+          PY
+
+      - name: Verificar sintaxe PowerShell e preparar pacote de instalacao
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path 'lab/0149/Instalar-Modelos-Livres-0149.ps1').Path,
+            [ref]$tokens,[ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) { throw "Erro de sintaxe PowerShell: $($errors[0].Message)" }
+          Copy-Item -LiteralPath lab/0149/Instalar-Modelos-Livres-0149.ps1 -Destination resultado/Instalar-Modelos-Livres-0149.ps1
+          Copy-Item -LiteralPath lab/0149/LEIA-ME.txt -Destination resultado/LEIA-ME.txt
+          $files = Get-ChildItem -Path resultado -File | Select-Object -ExpandProperty Name
+          $expected = @('sidekick-ALEC-modelos.mjs','MANIFESTO.json','Instalar-Modelos-Livres-0149.ps1','LEIA-ME.txt')
+          if (@(Compare-Object $files $expected).Count -ne 0) { throw 'Pacote contem ficheiros inesperados ou em falta' }
+          Write-Host 'Pacote validado. Nenhum executavel, voz ou pasta de memoria incluido.'
+
+      - name: Publicar apenas patch PowerShell sem instalador Roamies
+        uses: actions/upload-artifact@v4
+        with:
+          name: "ALEC-0149-Modelos-Livres-PowerShell"
+          path: resultado/
+          retention-days: 14
+          if-no-files-found: error
