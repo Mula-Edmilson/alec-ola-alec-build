@@ -1464,10 +1464,11 @@ async function prompt(text, image = null, note = '', byVoice = false, news = nul
   controller = new AbortController();
   agent.setSignal(controller.signal);
   // "Send an agent to…": the agents' corner hatches one instead of the thought cloud while the brief is written.
-  const agentish = !chatOnlyNow() && !intro && !news && wantsAgent(text);
+  const agentish = !intro && !news && wantsAgent(text);
+  const canHatch = agentish && !chatOnlyNow();
   turnImage = image;
-  ui({ kind: 'agent', e: { type: 'start', ...(agentish ? { agentish: true } : {}) } });
-  let hatching = agentish;
+  ui({ kind: 'agent', e: { type: 'start', ...(canHatch ? { agentish: true } : {}) } });
+  let hatching = canHatch;
   const hatchOff = () => { if (hatching) { hatching = false; ui({ kind: 'agents', e: { type: 'hatch_off' } }); } };
   // Voice: the socket opens now, while the model thinks; sentences are spoken as soon as each is ready.
   const voice = VOICE_ON() ? speech.start() : (speech.stop(), null);
@@ -1513,10 +1514,10 @@ async function prompt(text, image = null, note = '', byVoice = false, news = nul
     if (brief) { config.briefDay = brief.day; saveConfig(); logLine('brief', { todoist: !!config.briefTodoist && HANDS_OK }); }
     const onScreen = [takeQuizNote(), ink.listNote()].filter(Boolean).join(' '); // a quiz's score, lists changed on their cards
     // They spoke first: untold news rides along with their message, so it's never announced separately afterwards.
-    const along = desk.along(text, { intro: !!intro, news: !!news, agentish });
+    const along = desk.along(text, { intro: !!intro, news: !!news, agentish: canHatch });
     const stamped = `[${stampNow()}] ${text}${onScreen ? `\n(${onScreen})` : ''}${along}`;
-    const nudge = !agentish && !intro && !news && !handoff ? delegateNote(text, crewNow(), config.delegate) : '';
-    const toAgent = agentish ? `${stamped}\n(They asked for an agent: call send_agent.)` : nudge ? `${stamped}\n${nudge}` : stamped;
+    const nudge = !canHatch && !intro && !news && !handoff ? delegateNote(text, crewNow(), config.delegate) : '';
+    const toAgent = canHatch ? `${stamped}\n(They asked for an agent: call send_agent.)` : nudge ? `${stamped}\n${nudge}` : stamped;
     const asked = handoff ? `${toAgent}\n${handoffNote({ userName, assistant: lookName(), reason: handoff.reason, from: handoff.from, kind: handoff.kind, words: turnWords, untilText: handoff.untilText, because: handoff.because, fix: handoff.fix })}` : toAgent;
     const sent = brief ? `${asked}\n(${brief.note})` : asked;
     // An area snap rides along as an image in the same message.
@@ -1529,7 +1530,7 @@ async function prompt(text, image = null, note = '', byVoice = false, news = nul
     // and say so, instead of waiting silently forever with every later request queued behind it.
     // An agent request's words wait until it's clear whether an agent launched: then they're dropped (the launch is
     // the reply); otherwise they show as usual. Once any agent launches, the rest of the request's words are dropped.
-    let hold = agentish ? '' : null, launched = false;
+    let hold = canHatch ? '' : null, launched = false;
     const release = () => {
       if (hold == null) return;
       const h = hold; hold = null; hatchOff();
