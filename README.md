@@ -1,6 +1,6 @@
 # ALEC — Activação «Olá Alec» para Roamies (Windows)
 
-Compilação isolada de `roamies-voice.exe` para activar o Roamies com **«Olá Alec»** sem exigir «Hey Jarvis». O detector original mantém-se disponível. Não altera o `sidekick.mjs`, a voz clonada Fish Audio, a API Key, o nome do utilizador, a memória nem a interface.
+Compilação isolada de `roamies-voice.exe` para activar o Roamies com **«Olá Alec»** sem exigir «Hey Jarvis». A revisão V2 também reconhece variantes de transcrição, por exemplo «Olha Alex» e «Hello Alec». O detector original mantém-se disponível. Não altera o `sidekick.mjs`, a voz clonada Fish Audio, a API Key, o nome do utilizador, a memória nem a interface.
 
 ## Compatibilidade
 
@@ -32,3 +32,34 @@ O nome exibido no painel poderá continuar a ser «Hey Jarvis»: a alteração �
 O instalador valida o SHA256 e a versão da aplicação, faz backup do executável original em `Downloads\Roamies-Ola-Alec\backup` e só então o substitui. Para restaurar, fecha o Roamies e executa `Restaurar-ALEC.ps1`. Uma actualização automática do Roamies pode desfazer esta personalização. O reconhecimento depende da transcrição efectuada pelo modelo Parakeet e da qualidade do microfone; um teste real no PC ainda é necessário.
 
 Código-fonte original: [KenKaiii/Roamies](https://github.com/KenKaiii/Roamies). Este projecto é apenas uma personalização local, sem afiliação ao autor original.
+
+## Quando «Olá Alec» não é reconhecido (diagnóstico V2)
+
+O reconhecimento depende de duas etapas: Parakeet transforma a fala em texto e o detector procura a expressão. Os testes Rust verificam a segunda etapa, não o teu microfone.
+
+A revisão V2 inclui `Diagnosticar-ALEC.ps1`, com registo local das transcrições **desligado por defeito**. A utilização é opcional e deve ser breve, pois o microfone pode transcrever falas privadas durante o diagnóstico.
+
+1. No Roamies, mantém **Listening → Hands-free → Wake word ON** e o nome **Alec** (uma só palavra).
+2. Na pasta extraída do ZIP V2, executa em PowerShell:
+
+```powershell
+Unblock-File ".\Diagnosticar-ALEC.ps1"
+& ".\Diagnosticar-ALEC.ps1" -Acao Ativar
+```
+
+3. Diz em tom normal «Olá Alec» **3 vezes**, com pausas entre tentativas. Não fales sobre informações privadas neste período.
+4. Desliga a recolha e apresenta as últimas transcrições:
+
+```powershell
+& ".\Diagnosticar-ALEC.ps1" -Acao Recolher
+```
+
+5. **Revê o resultado antes de o partilhares**: o texto pode incluir o que foi dito perto do microfone. Se nada for recolhido, confirma se o helper está em modo Wake e consulta `~/Roamies/Data/logs/sidekick-voice.log`.
+
+Para desligar o diagnóstico sem apresentar transcrições:
+
+```powershell
+& ".\Diagnosticar-ALEC.ps1" -Acao Desativar
+```
+
+O sinalizador usado é `%USERPROFILE%\Roamies\Data\alec-wake-debug.flag`. Não há envio dessas transcrições pelo diagnóstico para a nuvem.
