@@ -1511,7 +1511,7 @@ async function prompt(text, image = null, note = '', byVoice = false, news = nul
     // The first spoken request of the day carries the morning briefing (brief.mjs).
     const brief = intro ? null : briefNote({ on: !!config.morningBrief, lastDay: config.briefDay, byVoice, todoist: !!config.briefTodoist, canRead: HANDS_OK, name: userName });
     if (brief) { config.briefDay = brief.day; saveConfig(); logLine('brief', { todoist: !!config.briefTodoist && HANDS_OK }); }
-    const onScreen = chatOnlyNow() ? '' : [takeQuizNote(), ink.listNote()].filter(Boolean).join(' '); // a quiz's score, lists changed on their cards
+    const onScreen = [takeQuizNote(), ink.listNote()].filter(Boolean).join(' '); // a quiz's score, lists changed on their cards
     // They spoke first: untold news rides along with their message, so it's never announced separately afterwards.
     const along = desk.along(text, { intro: !!intro, news: !!news, agentish });
     const stamped = `[${stampNow()}] ${text}${onScreen ? `\n(${onScreen})` : ''}${along}`;
