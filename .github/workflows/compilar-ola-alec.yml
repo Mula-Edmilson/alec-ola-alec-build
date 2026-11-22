@@ -1,0 +1,147 @@
+name: "ALEC - Compilar Ola Alec para Windows"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/compilar-ola-alec.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compilar:
+    name: "Compilar helper Windows x64"
+    runs-on: windows-latest
+    timeout-minutes: 120
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_BUILD_JOBS: "2"
+    steps:
+      - name: Obter projecto ALEC
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Descarregar codigo oficial do Roamies v0.1.49
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch v0.1.49 https://github.com/KenKaiii/Roamies.git upstream
+          python - <<'PYVERSION'
+          import json
+          from pathlib import Path
+          file = Path('upstream/showcase/tauri/src-tauri/tauri.conf.json')
+          version = json.loads(file.read_text(encoding='utf-8'))['version']
+          assert version == '0.1.49', f'Incompatibilidade: {version}'
+          print('Versao verificada:', version)
+          PYVERSION
+
+      - name: Aplicar patch nativo e testes do Ola Alec
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PYPATCH'
+          from pathlib import Path
+
+          file = Path('upstream/showcase/tauri/src-tauri/voice-win/src/wake.rs')
+          text = file.read_text(encoding='utf-8')
+          impl = 'impl WakeWord {'
+          scan = '    pub fn scan(&self, text: &str) -> Scan {\n        let words = tokens(text);\n'
+          test = '    #[test]\n    fn a_name_of_the_users_own() {'
+          for anchor in (impl, scan, test):
+              if text.count(anchor) != 1:
+                  raise SystemExit('Codigo-fonte inesperado: ' + repr(anchor))
+          helper = r'''
+          // ALEC_PT_WAKE_V1: frase portuguesa independente do nome de activacao escolhido.
+          // Variantes restritas para reduzir activacoes acidentais.
+          fn alec_portuguese_wake(text: &str, words: &[Token]) -> Option<String> {
+              for i in 0..words.len().saturating_sub(1) {
+                  let greeting = matches!(words[i].word.as_str(), "olá" | "ola" | "hola" | "alô" | "alo");
+                  let name = matches!(words[i + 1].word.as_str(), "alec" | "alek" | "aleck" | "aleque" | "aleke" | "alex" | "alexe");
+                  if !greeting || !name { continue; }
+                  let between = &text[words[i].end..words[i + 1].start];
+                  if !between.chars().all(|c| c == ' ' || c == ',' || c == '\t') { continue; }
+                  let before = &text[if i == 0 { 0 } else { words[i - 1].end }..words[i].start];
+                  let at_start = i == 0 || before.contains(['.', '!', '?'])
+                      || (i <= 2 && words[..i].iter().all(|w| matches!(w.word.as_str(), "hum" | "hm" | "ah" | "um")));
+                  if !at_start { continue; }
+                  let rest = text[words[i + 1].end..].trim_start_matches(|c: char| !c.is_alphanumeric());
+                  return Some(rest.trim().to_string());
+              }
+              None
+          }
+
+          '''
+          tests = r'''
+              #[test]
+              fn ola_alec_portugues() {
+                  let mut w = WakeWord::default();
+                  assert_eq!(w.match_rest("Olá Alec"), Some(String::new()));
+                  assert_eq!(w.match_rest("Ola Alec"), Some(String::new()));
+                  assert_eq!(w.match_rest("Olá, Alec!"), Some(String::new()));
+                  assert_eq!(w.match_rest("Olá Alec, que horas são?").as_deref(), Some("que horas são?"));
+                  assert_eq!(w.match_rest("Olá Alex, abre o Chrome").as_deref(), Some("abre o Chrome"));
+                  assert_eq!(w.match_rest("Olá Aleque"), Some(String::new()));
+                  assert_eq!(w.match_rest("Eu disse olá Alec ontem"), None);
+                  assert_eq!(w.match_rest("Olá Bernardo"), None);
+                  assert!(w.set_name(Some("Jarvis")));
+                  assert_eq!(w.match_rest("Olá Alec, bom dia").as_deref(), Some("bom dia"));
+                  assert_eq!(w.match_rest("Hey Jarvis"), Some(String::new()));
+              }
+
+          '''
+          text = text.replace(impl, helper + impl, 1)
+          text = text.replace(scan, scan + '        if let Some(rest) = alec_portuguese_wake(text, &words) {\n            return Scan { rest: Some(rest), distance: Some(0) };\n        }\n', 1)
+          text = text.replace(test, tests + test, 1)
+          file.write_text(text, encoding='utf-8', newline='\n')
+          print('Detector Ola Alec preparado.')
+          PYPATCH
+
+      - name: Configurar Rust MSVC no servidor
+        shell: pwsh
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustup target add x86_64-pc-windows-msvc
+          cargo --version
+
+      - name: Testar reconhecimento
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --release --locked --manifest-path upstream/showcase/tauri/src-tauri/voice-win/Cargo.toml --target x86_64-pc-windows-msvc wake::tests -- --nocapture
+
+      - name: Compilar apenas roamies-voice.exe
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --release --locked --manifest-path upstream/showcase/tauri/src-tauri/voice-win/Cargo.toml --target x86_64-pc-windows-msvc
+
+      - name: Preparar executavel, versao e integridade
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = 'upstream/showcase/tauri/src-tauri/voice-win/target/x86_64-pc-windows-msvc/release/roamies-voice.exe'
+          if (!(Test-Path -LiteralPath $exe)) { throw "Executavel nao encontrado: $exe" }
+          New-Item -ItemType Directory -Path resultado -Force | Out-Null
+          Copy-Item -LiteralPath $exe -Destination resultado/roamies-voice.exe
+          '0.1.49' | Set-Content -Path resultado/ROAMIES_VERSION.txt -Encoding ascii
+          (Get-FileHash -Path resultado/roamies-voice.exe -Algorithm SHA256).Hash | Set-Content -Path resultado/SHA256.txt -Encoding ascii
+          if (Test-Path -LiteralPath 'Instalar-ALEC-Compilado.ps1') {
+            Copy-Item -LiteralPath 'Instalar-ALEC-Compilado.ps1' -Destination resultado/Instalar-ALEC-Compilado.ps1
+          }
+          'Detector Olá Alec para Roamies 0.1.49 Windows x64. Compilado a partir do codigo-fonte oficial.' | Set-Content -Path resultado/LEIA-ME.txt -Encoding utf8
+
+      - name: Publicar ZIP do executavel
+        uses: actions/upload-artifact@v4
+        with:
+          name: "ALEC-Ola-Alec-Windows"
+          path: resultado/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 6
