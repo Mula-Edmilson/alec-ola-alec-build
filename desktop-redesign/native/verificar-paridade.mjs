@@ -7,6 +7,7 @@ const root=path.resolve(process.argv[2]||'upstream');
 const git=(...a)=>execFileSync('git',['-C',root,...a],{encoding:'utf8',maxBuffer:16*1024*1024});
 assert.equal(git('rev-parse','HEAD').trim(),'362645466349f4c520ad453d94a94c2481776c2f');
 const allowed=new Set([
+ 'showcase/tauri/src-tauri/build.rs',
  "showcase/tauri/src-tauri/icons/icon.ico","showcase/tauri/src-tauri/icons/32x32.png","showcase/tauri/src-tauri/icons/128x128.png","showcase/tauri/src-tauri/icons/128x128@2x.png","showcase/tauri/src-tauri/icons/icon.png","showcase/tauri/src-tauri/icons/icon.icns",
  'showcase/tauri/sidecar/sidekick.mjs','showcase/tauri/sidecar/speaker.mjs',
  'showcase/tauri/sidecar/test/prompt.test.mjs',
@@ -73,4 +74,8 @@ assert.ok(panelSource.includes('alec-official-logo')&&!panelSource.includes('htt
 assert.ok(shell.includes('voice_owner.as_deref()==Some(label.as_str())'),'Only one overlay receives speech');
 assert.ok(after(core+'speaker.mjs').includes('generation!==tries'),'Ignore stale speech-provider callbacks');
 for(const f of ['glass.js','agent.js','agent-cards.js','agent-panel.js','ink.js','sidebar.js','notch.js','ask-bar.js'])assert.ok(!/#78ffe2\b|rgba?\(\s*120\s*,\s*255\s*,\s*226\b/i.test(after('showcase/roamies/'+f)),'Legacy brand accent in '+f);
+assert.ok(source.includes("async function startAlecTailnet")&&source.includes("await detectTailnet()")&&source.includes("alecTailnetGeneration"),'Cancellable Tailscale discovery and managed start');
+assert.ok(panelSource.includes("role:'switch'")&&panelSource.includes("alec_bridge_tailnet_start")&&panelSource.includes("alec_bridge_stop"),'Native Bridge toggle');
+assert.ok(after(core+'alec-bridge-supervisor.mjs').includes("status','--json'")&&after(core+'alec-bridge-supervisor.mjs').includes("settings.tailnet?'100.64.0.0/10'"),'Authenticated tailnet state and private bind');
+assert.ok(after('showcase/tauri/src-tauri/build.rs').includes('window_icon_path("icons/icon.ico")'),'PE icon explicitly bound');
 console.log('Parity source gate OK: '+protectedPaths.length+' original tracked paths protected; all native script references preserved. Runtime behavior still requires tests.');
