@@ -41,10 +41,9 @@ jobs:
         working-directory: upstream/showcase/tauri/sidecar
         shell: bash
         run: npm ci
-      - name: Run original sidecar test suite without weakening assertions
-        working-directory: upstream/showcase/tauri/sidecar
+      - name: Run every sidecar regression test and report all failures
         shell: bash
-        run: npm test
+        run: node desktop-redesign/native/executar-testes.mjs upstream/showcase/tauri/sidecar/test
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
