@@ -229,7 +229,7 @@ function panel() {`);
     const initial=b.settings||{};
     const key=JSON.stringify(initial);
     if(!alecBridgeDraft||alecBridgeDraftKey!==key){
-      alecBridgeDraft={project:'',python:'',bind:b.interfaces?.find(a=>!a.startsWith('127.'))||'127.0.0.1',roots:[],transfer:'',ask:false,screen:false,camera:false,auto:false,visionServer:'',visionModel:'',ollamaModel:'',...initial};
+      alecBridgeDraft={project:b.defaults?.project||'',python:b.defaults?.python||'',bind:b.interfaces?.find(a=>!a.startsWith('127.'))||'127.0.0.1',roots:[],transfer:'',ask:false,screen:false,camera:false,auto:false,visionServer:'',visionModel:'',ollamaModel:'',...initial};
       alecBridgeDraftKey=key;
     }
     const d=alecBridgeDraft,locked=['running','starting','stopping'].includes(b.phase);
@@ -257,11 +257,16 @@ function panel() {`);
   function generalPage() {`);
   rep(pj,"const profile=state.alecPersona;\n    return [","const profile=state.alecPersona;\n    return [\n      managedBridgeGroup(),");
   out["showcase/panel/alec-theme.css"]+="\n.alec-bridge-field{display:grid;gap:5px;margin:7px 0}.alec-bridge-field input,.alec-bridge-field select,.alec-bridge-root input{min-width:0;width:100%;padding:8px;border:1px solid var(--line-hi);background:var(--panel);color:var(--ink);border-radius:7px;font:12px var(--mono)}.alec-bridge-root{display:flex;gap:5px;align-items:center}.alec-bridge-check{display:flex;align-items:center;gap:7px;margin:6px 0}.alec-pair{background:var(--panel);border:1px solid var(--line);padding:12px;border-radius:9px;text-align:center}.alec-pair strong{font-size:26px;letter-spacing:.2em;color:var(--accent)}\n";
+  if(profile.bundleBridge){
+    const bundledCfg=JSON.parse(out[tc]);
+    bundledCfg.bundle.resources["../alec-remote/"]="alec-remote/";
+    out[tc]=JSON.stringify(bundledCfg,null,2)+"\n";
+  }
   return {out,changes};
 }
 const paths=["showcase/tauri/sidecar/sidekick.mjs","showcase/tauri/sidecar/speaker.mjs","showcase/tauri/sidecar/fish.mjs","showcase/tauri/sidecar/local.mjs","showcase/panel/index.html","showcase/panel/panel.js","showcase/panel/panel.css","showcase/roamies/12-sidekick.js","showcase/roamies/jarvis.js","showcase/desktop.html","showcase/tauri/src-tauri/tauri.conf.json","showcase/tauri/src-tauri/src/main.rs"];
-const [rootArg,legacyArg]=process.argv.slice(2);
-if(!rootArg||!legacyArg){console.error('Usage: node preparar-fonte.mjs <fresh-upstream-checkout> <private-sidekick.mjs>');process.exit(1);}
+const [rootArg,legacyArg,bridgeArg]=process.argv.slice(2);
+if(!rootArg||!legacyArg){console.error('Usage: node preparar-fonte.mjs <fresh-upstream-checkout> <private-sidekick.mjs> [extracted-V16-project]');process.exit(1);}
 const root=path.resolve(rootArg),legacyPath=path.resolve(legacyArg);
 if(legacyPath.startsWith(root+path.sep))throw Error('Keep private sidekick outside the source checkout.');
 const original=fs.readFileSync(legacyPath);
@@ -278,13 +283,17 @@ const actual=execFileSync('git',['-C',root,'describe','--tags','--exact-match','
 if(actual!=='v0.1.51')throw Error('Only v0.1.51 is supported.');
 if(execFileSync('git',['-C',root,'status','--porcelain'],{encoding:'utf8'}).trim())throw Error('Use a clean disposable checkout.');
 const files=Object.fromEntries(paths.map(p=>[p,fs.readFileSync(path.join(root,p),'utf8').replace(/\r\n/g,'\n')]));
-const {out,changes}=prepareSources(files,{voice,name,bridge:legacy.slice(0,boundary),bridgeSupervisor:fs.readFileSync(new URL('./alec-bridge-supervisor.mjs',import.meta.url),'utf8')});
+const {out,changes}=prepareSources(files,{voice,name,bridge:legacy.slice(0,boundary),bridgeSupervisor:fs.readFileSync(new URL('./alec-bridge-supervisor.mjs',import.meta.url),'utf8'),bundleBridge:!!bridgeArg});
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'alec-check-'));
 try{
  for(const [p,s] of Object.entries(out)){
   if(s===files[p]||! /\.(?:mjs|js)$/.test(p))continue;
   const dest=path.join(temp,path.basename(p));fs.writeFileSync(dest,s);
   execFileSync(process.execPath,['--check',dest],{stdio:'inherit'});
+ }
+ if(bridgeArg){
+  const {copyAuditedBridge}=await import('./alec-bridge-supervisor.mjs');
+  copyAuditedBridge(path.resolve(bridgeArg),path.join(root,'showcase','tauri','alec-remote'));
  }
  // Source preparation only: never modify installed Roamies, its credentials, or its data.
  for(const [p,s] of Object.entries(out)){if(s===files[p])continue;fs.writeFileSync(path.join(root,p),s,'utf8');}
