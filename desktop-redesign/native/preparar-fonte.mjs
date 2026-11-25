@@ -90,6 +90,7 @@ function makeAgent(cc) {
   rep(pa,'<link rel="stylesheet" href="panel.css">','<link rel="stylesheet" href="panel.css">\n<link rel="stylesheet" href="alec-theme.css">');
   rep(de,"<title>Roamies on the desktop</title>","<title>ALEC on the desktop</title>");
   rep(dj,"pal: [[4, 16, 18], [14, 92, 96], [40, 196, 184], [120, 255, 226], [230, 255, 250]],","pal: [[7,10,18], [36,45,91], [96,110,205], [166,186,255], [234,242,255]],");
+  rep(pj,"const LED = [[4, 16, 18], [14, 92, 96], [40, 196, 184], [120, 255, 226], [230, 255, 250]];","const LED = [[7,10,18], [36,45,91], [96,110,205], [166,186,255], [234,242,255]];");
   // Preserve the actual renderer and its cursor/readout; make the sphere breathe, with real native voice amplitude.
   rep(ja,"const DOTS = { default: sphere(520), small: sphere(260) };","const DOTS = { default: sphere(720), small: sphere(300) };");
   rep(ja,"mode === 'think' ? 1.6 : A === 'hype' ? 3 : st.sleepy > 0.5 ? 0.1 : 0.32","mode === 'think' ? 1.6 : A === 'hype' ? 3 : st.sleepy > 0.5 ? 0.08 : 0.18");
