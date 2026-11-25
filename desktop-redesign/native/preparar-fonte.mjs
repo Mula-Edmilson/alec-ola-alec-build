@@ -160,6 +160,30 @@ const system = () => (config.lite ? litePrompt() : stablePrompt()) + (config.loo
         ...[['Website','https://www.edmilsonmula.com'],['GitHub','https://github.com/Mula-Edmilson'],['Instagram','https://www.instagram.com/mula_edmilson/'],['ALEC source','https://github.com/Mula-Edmilson/alec-ola-alec-build']].map(([label,url])=>el('div',{className:'setting'},el('span',{textContent:label}),link('Open',()=>send({type:'open_link',url}),{k:'alec-'+label}))),
         el('p',{textContent:'Based on Roamies · AGPL-3.0'})),
       group('Original Roamies credits', null, null, maker(),`);
+
+  // Desktop-owned preferences; mailbox control is distinct from the external Bridge process.
+  rep(sc,"alecReady||!alecFs.existsSync", "alecReady||config.alecRemoteEnabled===false||!alecFs.existsSync");
+  rep(sc,"alecSkillHub: skillHub.snapshot(),", "alecRemote: { runtimeReady: alecReady, mailbox: alecReady && alecFs.existsSync(alecPath.join(alecDir,'enabled')), allowed: config.alecRemoteEnabled !== false }, alecPersona: ['balanced','concise','creative'].includes(config.alecPersona) ? config.alecPersona : 'balanced', alecSkillHub: skillHub.snapshot(),");
+  rep(sc,"else if (m.type === 'alec_skill_inspect'", `else if (m.type === 'alec_remote_access' && typeof m.enabled === 'boolean') {
+    config.alecRemoteEnabled=m.enabled; saveConfig(); panel();
+  } else if (m.type === 'alec_persona' && ['balanced','concise','creative'].includes(m.profile)) {
+    if(busy || queued){panelNote('Aguarde o fim da tarefa para alterar a personalidade.',true);return;}
+    config.alecPersona=m.profile; agent=null; saveConfig(); panel();
+  } else if (m.type === 'alec_skill_inspect'`);
+  rep(sc,"const system = () => (config.lite ? litePrompt() : stablePrompt()) + (config.look === 'jarvis' ? '\\n\\n'+ALEC_PERSONA : '');",`const alecPersonaText = () => ALEC_PERSONA + ({concise:' Be especially concise and technical.',creative:' Offer creative alternatives when relevant.',balanced:' Balance technical precision with natural conversation.'}[config.alecPersona] || '');
+const system = () => (config.lite ? litePrompt() : stablePrompt()) + (config.look === 'jarvis' ? '\\n\\n'+alecPersonaText() : '');`);
+  rep(sc,"facts: listFacts() }) : system(),","facts: listFacts() }) + (config.look === 'jarvis' ? '\\n'+alecPersonaText() : '') : system(),");
+  rep(pj,"function generalPage() {\n    return [",`function generalPage() {
+    const r=state.alecRemote;
+    const profile=state.alecPersona;
+    return [
+      r ? group('ALEC Remote', 'Estado do hook local. Não confirma ligação do telefone nem o processo externo do Bridge.', null,
+        el('p',{textContent:r.runtimeReady?'Motor de integração pronto':'Motor de integração indisponível'}),
+        el('p',{textContent:r.mailbox?'Mailbox sinalizada pelo Bridge':'Mailbox não sinalizada'}),
+        toggle('Receber comandos remotos','Só controla a mailbox V11; não altera permissões de ficheiros nem encerra o Bridge.',r.allowed,()=>send({type:'alec_remote_access',enabled:!r.allowed}),'alec-remote-access')) : null,
+      profile ? group('Personalidade ALEC', 'Aplica-se ao personagem ALEC. Não altera permissões nem os restantes personagens.', null,
+        el('span',{className:'px field select'},el('select',{'aria-label':'Personalidade ALEC','data-k':'alec-persona',disabled:state.busy,on:{change:e=>send({type:'alec_persona',profile:e.target.value})}},
+          ...[['balanced','Profissional'],['concise','Técnico e conciso'],['creative','Criativo e proactivo']].map(([value,label])=>el('option',{value,textContent:label,selected:profile===value}))))) : null,`);
   return {out,changes};
 }
 const paths=["showcase/tauri/sidecar/sidekick.mjs","showcase/tauri/sidecar/speaker.mjs","showcase/tauri/sidecar/fish.mjs","showcase/tauri/sidecar/local.mjs","showcase/panel/index.html","showcase/panel/panel.js","showcase/panel/panel.css","showcase/roamies/12-sidekick.js","showcase/roamies/jarvis.js","showcase/desktop.html","showcase/tauri/src-tauri/tauri.conf.json","showcase/tauri/src-tauri/src/main.rs"];
