@@ -95,6 +95,8 @@ jobs:
           New-Item -ItemType Directory -Force $data | Out-Null
           Set-Content (Join-Path $data 'sidekick.json') '{"onboarded":true,"setupVersion":2,"voice":false,"alecRemoteEnabled":false}'
           $env:ROAMIES_DATA_DIR = $data
+          # Test runner only: inspect the actual installed WebView2. Never embedded in the release.
+          $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=9222 --remote-debugging-address=127.0.0.1'
           $run = Start-Process -FilePath $app.FullName -PassThru
           try {
             $logs = Join-Path $data 'Roamies/Data/logs'
@@ -105,15 +107,18 @@ jobs:
               if (Get-ChildItem $logs -Filter *.log -ErrorAction SilentlyContinue | Select-String -Pattern ' start ' -Quiet) { $started=$true; break }
             }
             if (-not ($started -and -not $run.HasExited)) { throw 'Installed sidecar did not start' }
+            Start-Process -FilePath $app.FullName -ArgumentList '--panel'
+            & node (Join-Path $env:GITHUB_WORKSPACE 'desktop-redesign/native/verificar-visual-instalado.mjs') (Join-Path $env:GITHUB_WORKSPACE 'candidate/ALEC-installed-dashboard.png')
+            if ($LASTEXITCODE) { throw 'Actual installed dashboard visual check failed' }
           } finally {
             if (-not $run.HasExited) { taskkill /PID $run.Id /T /F | Out-Null }
           }
           $out = Join-Path $env:GITHUB_WORKSPACE 'candidate'
           New-Item -ItemType Directory -Force $out | Out-Null
-          $dest = Join-Path $out 'ALEC-Desktop-0.1.51-x64-candidate-setup.exe'
+          $dest = Join-Path $out 'ALEC-Desktop-0.1.51-Orb-v2-x64-candidate-setup.exe'
           Copy-Item $setup.FullName $dest
           $hash = (Get-FileHash $dest -Algorithm SHA256).Hash.ToLowerInvariant()
-          Set-Content (Join-Path $out 'SHA256.txt') "$hash  ALEC-Desktop-0.1.51-x64-candidate-setup.exe"
+          Set-Content (Join-Path $out 'SHA256.txt') "$hash  ALEC-Desktop-0.1.51-Orb-v2-x64-candidate-setup.exe"
       - name: Include corresponding source and license
         shell: bash
         run: |
@@ -129,7 +134,7 @@ jobs:
           git rev-parse HEAD >> candidate/SOURCE.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: ALEC-Desktop-Windows-x64-candidate
+          name: ALEC-Desktop-Orb-v2-Windows-x64-candidate
           path: candidate/
           if-no-files-found: error
           retention-days: 30
