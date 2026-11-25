@@ -31,6 +31,8 @@ function prepareSources(files, profile) {
   rep(sp,"say(s) { if (done) return; mark(s); said.push(s); v.say(s); },","say(s) { if (done) return; alecSay(id,s); mark(s); said.push(s); v.say(s); },");
   rep(sp,"log('speech_beat', { id, ms: Date.now() - t0 });","alecSay(id,phrase); log('speech_beat', { id, ms: Date.now() - t0 });");
   // Personalized voice, kept local. Preserve the user's explicit free-only configuration.
+  const nativeFish=out[fi];
+  const nativeUser=out[sc].match(/const userName = \(\(\) => \{[\s\S]*?\n\}\)\(\);/)?.[0];
   rep(sc,"const lookVoice = () => (LOOKS.find(([id]) => id === config.look) ?? LOOKS[0])[2];",`const lookVoice = () => ${JSON.stringify(profile.voice)};`);
   rep(fi,"text: '', reference_id: voice, format: 'pcm'",`text: '', reference_id: ${JSON.stringify(profile.voice)}, format: 'pcm'`);
   rep(fi,"export const FISH_MODELS = ['drama-3', 's2.1-pro', 's2.1-pro-free'];","export const FISH_MODELS = ['s2.1-pro-free'];");
@@ -38,6 +40,16 @@ function prepareSources(files, profile) {
   rep(fi,choices,"export const FISH_CHOICES = [{ id: 's2.1-pro-free', name: 'S2.1 Pro Free', perM: 0 }];");
   const user=out[sc].match(/const userName = \(\(\) => \{[\s\S]*?\n\}\)\(\);/)?.[0];if(!user)throw Error("userName anchor");
   rep(sc,user,`const userName = ${JSON.stringify(profile.name)};`);
+  if(profile.publicBuild){
+    out["showcase/tauri/sidecar/alec-legacy-profile.mjs"]="import fs from 'node:fs';\nimport path from 'node:path';\nimport {createHash} from 'node:crypto';\n// Read the old installation as inert data, never execute it. No values logged or transmitted.\nexport const alecLegacyProfile=(()=>{\n  if(process.platform!=='win32'||!process.env.LOCALAPPDATA||process.env.ROAMIES_DATA_DIR)return null;\n  try {\n    const p=path.join(process.env.LOCALAPPDATA,'Roamies','sidecar','sidekick.mjs');\n    const stat=fs.statSync(p);if(!stat.isFile()||stat.size>16000000)return null;\n    const bytes=fs.readFileSync(p);\n    if(createHash('sha256').update(bytes).digest('hex')!=='4bd3e971b6ad039475ff52f23db5a7ded801a12c61189ab18ec96c303ddddfab')return null;\n    const legacy=bytes.toString('utf8');\n    const voice=legacy.match(/var lookVoice = \\(\\) => ['\"]([a-f0-9]{32})['\"];/i)?.[1];\n    const name=legacy.match(/\\/\\* ROAMIES_NOME_PERSONALIZADO \\*\\/ return \"([^\"\\r\\n]{1,70})\";/)?.[1];\n    if(!voice||!name||!legacy.includes('var FISH_MODELS = [\"s2.1-pro-free\"];'))return null;\n    return Object.freeze({voice,name});\n  }catch{return null;}\n})();\n";
+    out[sc]="import { alecLegacyProfile } from './alec-legacy-profile.mjs';\n"+out[sc];
+    rep(sc,`const lookVoice = () => ${JSON.stringify(profile.voice)};`,"const lookVoice = () => alecLegacyProfile?.voice ?? (LOOKS.find(([id]) => id === config.look) ?? LOOKS[0])[2];");
+    rep(sc,`const userName = ${JSON.stringify(profile.name)};`,nativeUser.replace("const userName =","const userName = alecLegacyProfile?.name ??"));
+    out[fi]="import { alecLegacyProfile } from './alec-legacy-profile.mjs';\n"+nativeFish;
+    rep(fi,"export const FISH_MODELS = ['drama-3', 's2.1-pro', 's2.1-pro-free'];","export const FISH_MODELS = alecLegacyProfile ? ['s2.1-pro-free'] : ['drama-3', 's2.1-pro', 's2.1-pro-free'];");
+    rep(fi,"export const FISH_CHOICES = [","export const FISH_CHOICES = alecLegacyProfile ? [{ id: 's2.1-pro-free', name:'S2.1 Pro Free', perM:0 }] : [");
+    rep(sc,"// Hybrid models (route.mjs):","if(alecLegacyProfile)config.fishModel='s2.1-pro-free';\n// Hybrid models (route.mjs):");
+  }
   // Re-register chat models without elevating their privileges. Text-only requests do not get tools or images.
   rep(lo,"export const localModels = (probes, windows = new Map()) => toolModels(probes, windows).filter((m) => m.supportsImages);",`export const localModels = (probes, windows = new Map()) => toolModels(probes, windows).filter((m) => m.supportsImages);
 const alecChatModels = (probes, windows = new Map()) => probes.filter(p => p.reachable).flatMap(p => p.models.filter(m => m.supportsChat !== false).map(m => {
@@ -49,14 +61,14 @@ const alecChatModels = (probes, windows = new Map()) => probes.filter(p => p.rea
   rep(lo,"const p = await probe(key ? { ...server, apiKey: key } : server, { timeoutMs: 1500 });","const p = await probe(key ? { ...server, apiKey: key } : server, { timeoutMs: server.custom && server.baseUrl.startsWith('https://') ? 12000 : 1500 });");
   rep(lo,"const usable = toolModels([p], windows), models = usable.filter((m) => m.supportsImages);","const usable = alecChatModels([p], windows), models = usable;");
   rep(lo,"text: usable.length - models.length","text: usable.filter(m => !m.supportsImages).length");
-  rep(sc,"const canRun = (p, id) => !!signedIn.get(p) && seesImages(p, id) && getAuthStorageKeys(p, id).some((k) => k === p || storedKeys.has(k));",`const alecConversationOnly = (provider, model) => provider === 'local' && !!model && (model.supportsTools !== true || model.supportsImages !== true);
+  rep(sc,"const canRun = (p, id) => !!signedIn.get(p) && seesImages(p, id) && getAuthStorageKeys(p, id).some((k) => k === p || storedKeys.has(k));",`const alecConversationOnly = (provider, model) => provider === 'local' && !!model && (model.supportsTools === false || model.supportsImages !== true);
 const alecConversationNow = () => alecConversationOnly(config.provider, getModel(config.model));
 const canRun = (p, id) => !!signedIn.get(p) && (p === 'local' || seesImages(p,id)) && getAuthStorageKeys(p,id).some(k => k === p || storedKeys.has(k));`);
-  rep(sc,"const textOnly = (p) => getModelsForProvider(p).filter((m) => !seesImages(p, m.id) && canRunText(p, m.id));","const textOnly = (p) => p === 'local' ? [] : getModelsForProvider(p).filter((m) => !seesImages(p, m.id) && canRunText(p, m.id));");
+  // Preserve upstream text-only subagents, while filtering unsupported models from the crew via crewSpec.
   rep(sc,"const crewNow = () => (config.subagents ?","const crewNow = () => (config.subagents && !alecConversationNow() ?");
   rep(sc,"const hybridActive = () => !!config.hybrid && hybridOn(config.heavy);","const hybridActive = () => !!config.hybrid && !alecConversationNow() && hybridOn(config.heavy);");
-  rep(sc,"const runnableSpec = (p, id) => canRun(p, id) || (p === 'local' && !!signedIn.get('local') && !!parseLocalModelId(id ?? ''));","const runnableSpec = (p,id) => (p !== 'local' || (getModel(id)?.supportsTools === true && getModel(id)?.supportsImages === true)) && (canRun(p,id) || (p === 'local' && !!signedIn.get('local') && !!parseLocalModelId(id ?? '')));");
-  rep(sc,"const crewSpec = (p, id) => runnableSpec(p, id) || canRunText(p, id);","const crewSpec = (p,id) => runnableSpec(p,id) || (canRunText(p,id) && (p !== 'local' || getModel(id)?.supportsTools === true));");
+  rep(sc,"const runnableSpec = (p, id) => canRun(p, id) || (p === 'local' && !!signedIn.get('local') && !!parseLocalModelId(id ?? ''));","const runnableSpec = (p,id) => (p !== 'local' || (getModel(id)?.supportsTools !== false && getModel(id)?.supportsImages === true)) && (canRun(p,id) || (p === 'local' && !!signedIn.get('local') && !!parseLocalModelId(id ?? '')));");
+  rep(sc,"const crewSpec = (p, id) => runnableSpec(p, id) || canRunText(p, id);","const crewSpec = (p,id) => runnableSpec(p,id) || (canRunText(p,id) && (p !== 'local' || getModel(id)?.supportsTools !== false));");
   rep(sc,"if (config.backups) (config.fallbacks","if (config.backups && !alecConversationNow()) (config.fallbacks");
   rep(sc,"if (!system && config.hybrid) {","if (!system && config.hybrid && !alecConversationNow()) {");
   rep(sc,"function makeAgent(cc) {\n  const m = getModel(config.model);",`const alecConversationHistory = (messages) => (Array.isArray(messages) ? messages : []).filter(m => m && (m.role === 'user' || m.role === 'assistant')).map(m => {
@@ -108,10 +120,10 @@ function makeAgent(cc) {
 .px,.px::before { clip-path:none; border-radius:8px; }
 .px { --bw:1px; }
 .navi[aria-current="page"], .looktile[aria-checked="true"] { --fill:#1b2540; --bc:#8296e8; }
-.frame.opening { animation:alec-open 180ms ease-out both; }
-.frame.shutting { animation:alec-close 120ms ease-in both; }
-@keyframes alec-open { from {opacity:0;transform:translateY(3px) scale(.99)} to {opacity:1;transform:none} }
-@keyframes alec-close { from {opacity:1} to {opacity:0} }
+.frame.opening { animation:crt-on 180ms ease-out both; }
+.frame.shutting { animation:crt-off 120ms ease-in both; }
+@keyframes crt-on { from {opacity:0;transform:translateY(3px) scale(.99)} to {opacity:1;transform:none} }
+@keyframes crt-off { from {opacity:1} to {opacity:0} }
 .pane.enter > *, .pane.enter .list > li { animation:alec-in 150ms ease-out both; }
 @keyframes alec-in { from {opacity:0} to {opacity:1} }
 @media(prefers-reduced-motion:reduce){.frame.opening,.frame.shutting,.pane.enter > *,.pane.enter .list > li {animation:none!important}}
@@ -162,8 +174,8 @@ const system = () => (config.lite ? litePrompt() : stablePrompt()) + (config.loo
       group('Original Roamies credits', null, null, maker(),`);
 
   // Desktop-owned preferences; mailbox control is distinct from the external Bridge process.
-  rep(sc,"alecReady||!alecFs.existsSync", "alecReady||config.alecRemoteEnabled===false||!alecFs.existsSync");
-  rep(sc,"alecSkillHub: skillHub.snapshot(),", "alecRemote: { runtimeReady: alecReady, mailbox: alecReady && alecFs.existsSync(alecPath.join(alecDir,'enabled')), allowed: config.alecRemoteEnabled !== false }, alecPersona: ['balanced','concise','creative'].includes(config.alecPersona) ? config.alecPersona : 'balanced', alecSkillHub: skillHub.snapshot(),");
+  rep(sc,"alecReady||!alecFs.existsSync", "alecReady||config.alecRemoteEnabled!==true||!alecFs.existsSync");
+  rep(sc,"alecSkillHub: skillHub.snapshot(),", "alecRemote: { runtimeReady: alecReady, mailbox: alecReady && alecFs.existsSync(alecPath.join(alecDir,'enabled')), allowed: config.alecRemoteEnabled === true }, alecPersona: ['balanced','concise','creative'].includes(config.alecPersona) ? config.alecPersona : 'balanced', alecSkillHub: skillHub.snapshot(),");
   rep(sc,"else if (m.type === 'alec_skill_inspect'", `else if (m.type === 'alec_remote_access' && typeof m.enabled === 'boolean') {
     config.alecRemoteEnabled=m.enabled; saveConfig(); panel();
   } else if (m.type === 'alec_persona' && ['balanced','concise','creative'].includes(m.profile)) {
@@ -273,7 +285,15 @@ function panel() {`);
 const paths=["showcase/tauri/sidecar/sidekick.mjs","showcase/tauri/sidecar/speaker.mjs","showcase/tauri/sidecar/fish.mjs","showcase/tauri/sidecar/local.mjs","showcase/panel/index.html","showcase/panel/panel.js","showcase/panel/panel.css","showcase/roamies/12-sidekick.js","showcase/roamies/jarvis.js","showcase/desktop.html","showcase/tauri/src-tauri/tauri.conf.json","showcase/tauri/src-tauri/src/main.rs"];
 const [rootArg,legacyArg,bridgeArg]=process.argv.slice(2);
 if(!rootArg||!legacyArg){console.error('Usage: node preparar-fonte.mjs <fresh-upstream-checkout> <private-sidekick.mjs> [extracted-V16-project]');process.exit(1);}
-const root=path.resolve(rootArg),legacyPath=path.resolve(legacyArg);
+const root=path.resolve(rootArg);
+const publicBuild=legacyArg==='--public';
+let voice,name,bridge;
+if(publicBuild){
+ voice='00000000000000000000000000000000';name='ALEC';
+ bridge=fs.readFileSync(new URL('./live-hook.mjs',import.meta.url),'utf8');
+ if(createHash('sha256').update(bridge.replace(/\r\n/g,'\n')).digest('hex')!=='5a17088fc7abc57ff4e0ea2d040855fa03291289fc83b3cd5eb9c0f87f9efcc4')throw Error('Generic V11 hook hash mismatch.');
+}else{
+const legacyPath=path.resolve(legacyArg);
 if(legacyPath.startsWith(root+path.sep))throw Error('Keep private sidekick outside the source checkout.');
 const original=fs.readFileSync(legacyPath);
 if(createHash('sha256').update(original).digest('hex')!=='4bd3e971b6ad039475ff52f23db5a7ded801a12c61189ab18ec96c303ddddfab')throw Error('Private bundle differs from the audited snapshot. No changes.');
@@ -281,15 +301,18 @@ const legacy=original.toString('utf8').replace(/\r\n/g,'\n');
 const marker="import { createRequire as __cr } from 'node:module';";
 const boundary=legacy.indexOf(marker);
 if(boundary<0||!legacy.startsWith('// ALEC_REMOTE_V11_HOOK')||boundary>20000)throw Error('Bridge boundary mismatch.');
-const voice=legacy.match(/var lookVoice = \(\) => ['"]([a-f0-9]{32})['"];/i)?.[1];
+voice=legacy.match(/var lookVoice = \(\) => ['"]([a-f0-9]{32})['"];/i)?.[1];
 const reference=legacy.match(/reference_id: ['"]([a-f0-9]{32})['"],/i)?.[1];
-const name=legacy.match(/\/\* ROAMIES_NOME_PERSONALIZADO \*\/ return "([^"\n]{1,70})";/)?.[1];
+name=legacy.match(/\/\* ROAMIES_NOME_PERSONALIZADO \*\/ return "([^"\n]{1,70})";/)?.[1];
 if(!voice||voice!==reference||!name||!legacy.includes('var FISH_MODELS = ["s2.1-pro-free"];'))throw Error('Voice/name migration anchors not found.');
+
+bridge=legacy.slice(0,boundary);
+}
 const actual=execFileSync('git',['-C',root,'describe','--tags','--exact-match','HEAD'],{encoding:'utf8'}).trim();
-if(actual!=='v0.1.51')throw Error('Only v0.1.51 is supported.');
+if(actual!=='v0.1.51'||execFileSync('git',['-C',root,'rev-parse','HEAD'],{encoding:'utf8'}).trim()!=='362645466349f4c520ad453d94a94c2481776c2f')throw Error('Only the audited Roamies v0.1.51 commit is supported.');
 if(execFileSync('git',['-C',root,'status','--porcelain'],{encoding:'utf8'}).trim())throw Error('Use a clean disposable checkout.');
 const files=Object.fromEntries(paths.map(p=>[p,fs.readFileSync(path.join(root,p),'utf8').replace(/\r\n/g,'\n')]));
-const {out,changes}=prepareSources(files,{voice,name,bridge:legacy.slice(0,boundary),bridgeSupervisor:fs.readFileSync(new URL('./alec-bridge-supervisor.mjs',import.meta.url),'utf8'),bundleBridge:!!bridgeArg});
+const {out,changes}=prepareSources(files,{voice,name,bridge,publicBuild,bridgeSupervisor:fs.readFileSync(new URL('./alec-bridge-supervisor.mjs',import.meta.url),'utf8'),bundleBridge:!!bridgeArg});
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'alec-check-'));
 try{
  for(const [p,s] of Object.entries(out)){
