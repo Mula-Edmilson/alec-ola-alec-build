@@ -92,14 +92,14 @@ jobs:
           & (Join-Path $dir 'roamies-node.exe') --check (Join-Path $dir 'sidecar/sidekick.mjs')
           if ($LASTEXITCODE) { throw 'Bundled sidecar syntax failed' }
           $data = Join-Path $env:RUNNER_TEMP 'alec-smoke'
-          New-Item -ItemType Directory -Force $data | Out-Null
-          Set-Content (Join-Path $data 'sidekick.json') '{"onboarded":true,"setupVersion":2,"voice":false,"alecRemoteEnabled":false}'
+          $configDir = Join-Path $data 'Roamies/Data'
+          New-Item -ItemType Directory -Force $configDir | Out-Null
+          Set-Content (Join-Path $configDir 'settings.json') '{"onboarded":true,"setupVersion":2,"voice":false,"alecRemoteEnabled":false,"seenVersion":"0.1.51"}' -Encoding utf8NoBOM
           $env:ROAMIES_DATA_DIR = $data
           # Test runner only: inspect the actual installed WebView2. Never embedded in the release.
           $env:ALEC_UI_TEST = '1'
-          $env:WEBVIEW2_USER_DATA_FOLDER = Join-Path $env:RUNNER_TEMP 'alec-webview-test'
           $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=9222 --remote-debugging-address=127.0.0.1'
-          $run = Start-Process -FilePath $app.FullName -PassThru
+          $run = Start-Process -FilePath $app.FullName -ArgumentList '--panel' -PassThru
           try {
             $logs = Join-Path $data 'Roamies/Data/logs'
             $started = $false
@@ -118,7 +118,12 @@ jobs:
               Start-Sleep -Seconds 1
             }
             if (-not (Test-Path $reportPath)) {
+              Write-Host '--- Native window trace ---'
+              Get-Content (Join-Path $data 'alec-native-window.log') -ErrorAction SilentlyContinue
+              Write-Host '--- Native sidecar trace ---'
               Get-ChildItem $logs -Filter *.log -ErrorAction SilentlyContinue | Get-Content -Tail 25
+              Get-Content (Join-Path $env:USERPROFILE 'Roamies/Data/logs/sidekick.log') -Tail 35 -ErrorAction SilentlyContinue
+              Get-Process -Name roamies,msedgewebview2 -ErrorAction SilentlyContinue | Select-Object Id,ProcessName,SessionId,MainWindowTitle | Format-Table -AutoSize
               throw 'Installed native dashboard did not report a visible orb and all eight navigation entries'
             }
             $report = Get-Content $reportPath -Raw | ConvertFrom-Json
