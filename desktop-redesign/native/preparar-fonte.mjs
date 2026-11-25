@@ -4,6 +4,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import os from 'node:os';
+import {fileURLToPath} from 'node:url';
 function prepareSources(files, profile) {
   const out = {...files};
   const changes=[];
@@ -496,6 +497,10 @@ function panel() {`);
   }
   rep(pj,"about:['info','Sobre','Versão, créditos e licenças']","about:['info','Sobre','Versão do core']");
   rep(pj,"\"Couldn't copy the error details. Try Save diagnostics.\"","\"Não foi possível copiar os detalhes do erro.\"");
+  rep(pj,"    diagnostic('visual-candidate',{lit,blue,","    // Exercise the real shared renderer on a detached Canvas in the installed WebView.\n    const probe=document.createElement('canvas');probe.width=probe.height=120;\n    const pc=probe.getContext('2d',{willReadFrequently:true}),renderer=window.Roamie.alecOrb;\n    const capture=(t,mode,level)=>{pc.clearRect(0,0,120,120);renderer.paint(pc,60,60,40,{t,mode,level,reduced:false});return pc.getImageData(0,0,120,120).data;};\n    const a=capture(0,'idle',0),b=capture(2,'idle',0),d=capture(0,'talk',1);\n    let coreLit=0,motionPixels=0,voicePixels=0;\n    for(let y=36;y<84;y++)for(let x=36;x<84;x++){if(Math.hypot(x-60,y-60)>22)continue;const i=(y*120+x)*4;if(a[i+3]>25)coreLit++;if(Math.abs(a[i+3]-b[i+3])+Math.abs(a[i+2]-b[i+2])>8)motionPixels++;if(Math.abs(a[i+3]-d[i+3])+Math.abs(a[i+2]-d[i+2])>8)voicePixels++;}\n    if(coreLit<100||motionPixels<50||voicePixels<50){diagnostic('plasma-probe',{coreLit,motionPixels,voicePixels});return;}\n    diagnostic('visual-candidate',{lit,blue,coreLit,motionPixels,voicePixels,");
+  rep(pj,"report:{revision:window.Roamie.alecOrb?.revision,width:r.width,height:r.height,lit,blue,","report:{revision:window.Roamie.alecOrb?.revision,width:r.width,height:r.height,lit,blue,coreLit,motionPixels,voicePixels,");
+  rep(sc,"lit:Number(q.lit)||0,blue:Number(q.blue)||0,","lit:Number(q.lit)||0,blue:Number(q.blue)||0,coreLit:Number(q.coreLit)||0,motionPixels:Number(q.motionPixels)||0,voicePixels:Number(q.voicePixels)||0,");
+  rep(sc,"safe.lit>100&&safe.blue>50&&safe.visible","safe.lit>100&&safe.blue>50&&safe.coreLit>=100&&safe.motionPixels>=50&&safe.voicePixels>=50&&safe.visible");
   return {out,changes};
 }
 const paths=["showcase/tauri/sidecar/sidekick.mjs","showcase/tauri/sidecar/speaker.mjs","showcase/tauri/sidecar/fish.mjs","showcase/tauri/sidecar/local.mjs","showcase/panel/index.html","showcase/panel/panel.js","showcase/panel/panel.css","showcase/roamies/12-sidekick.js","showcase/roamies/jarvis.js","showcase/desktop.html","showcase/tauri/src-tauri/tauri.conf.json","showcase/tauri/src-tauri/src/main.rs","showcase/tauri/src-tauri/voice-win/src/wake.rs","showcase/tauri/src-tauri/voice-win/src/main.rs","showcase/onboarding/onboarding.js","showcase/tauri/sidecar/test/prompt.test.mjs","showcase/tauri/sidecar/test/snooze.test.mjs","showcase/roamies/10-dither.js","showcase/tauri/src-tauri/src/voice.rs","showcase/roamies/ask-bar.js","showcase/roamies/core.js","showcase/roamies/host.js","showcase/roamies/glass.js","showcase/roamies/agent.js","showcase/roamies/agent-cards.js","showcase/roamies/agent-panel.js","showcase/roamies/ink.js","showcase/roamies/sidebar.js","showcase/roamies/notch.js"];
@@ -542,5 +547,6 @@ try{
  }
  // Source preparation only: never modify installed Roamies, its credentials, or its data.
  for(const [p,s] of Object.entries(out)){if(s===files[p])continue;fs.writeFileSync(path.join(root,p),s,'utf8');}
+ execFileSync(process.execPath,[fileURLToPath(new URL('./gerar-icones-alec.mjs',import.meta.url)),root],{stdio:'inherit'});
  console.log('Prepared source only; '+changes.length+' unique anchors verified. Personalization stays in the local checkout. Do not push this checkout.');
 }finally{fs.rmSync(temp,{recursive:true,force:true});}
