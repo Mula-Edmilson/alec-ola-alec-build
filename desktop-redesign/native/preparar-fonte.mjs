@@ -188,8 +188,8 @@ const system = () => (config.lite ? litePrompt() : stablePrompt()) + (config.loo
   // The managed Bridge is the actual V16 server from the user's local extracted project.
   if(typeof profile.bridgeSupervisor!=='string'||!profile.bridgeSupervisor.includes('createBridgeSupervisor'))throw Error('Bridge supervisor module missing.');
   out["showcase/tauri/sidecar/alec-bridge-supervisor.mjs"]=profile.bridgeSupervisor;
-  out[sc]="import { createBridgeSupervisor, cleanBridgeSettings } from './alec-bridge-supervisor.mjs';\n"+out[sc];
-  rep(sc,"function panel() {",`const alecBridge = createBridgeSupervisor({
+  out[sc]="import { createBridgeSupervisor, cleanBridgeSettings, readPersonalFolders } from './alec-bridge-supervisor.mjs';\n"+out[sc];
+  rep(sc,"function panel() {",`let alecImportedRoots=[];\nconst alecBridge = createBridgeSupervisor({
   changed: () => panel(),
   ready: settings => {
     if(settings.ask){
@@ -207,8 +207,11 @@ function startAlecBridge(settings){
   const saved=alecBridge.start(valid);config.alecBridge=saved;saveConfig();panel();
 }
 function panel() {`);
-  rep(sc,"alecRemote: { runtimeReady:", "alecManagedBridge: { ...alecBridge.snapshot(), settings: config.alecBridge ?? null }, alecRemote: { runtimeReady:");
-  rep(sc,"else if (m.type === 'alec_remote_access'",`else if (m.type === 'alec_bridge_save' || m.type === 'alec_bridge_start') {
+  rep(sc,"alecRemote: { runtimeReady:", "alecManagedBridge: { ...alecBridge.snapshot(), settings: config.alecBridge ?? null, importedRoots: alecImportedRoots }, alecRemote: { runtimeReady:");
+  rep(sc,"else if (m.type === 'alec_remote_access'",`else if(m.type==='alec_bridge_import'){
+    if(!['stopped','error'].includes(alecBridge.snapshot().phase))return;
+    try{alecImportedRoots=readPersonalFolders(m.project);panelNote('Pastas lidas. Reveja antes de aplicar.');}catch(e){alecImportedRoots=[];panelNote(String(e.message).slice(0,300),true);}panel();
+  } else if (m.type === 'alec_bridge_save' || m.type === 'alec_bridge_start') {
     if(!['stopped','error'].includes(alecBridge.snapshot().phase)){panelNote('Pare o Bridge antes de alterar configurações.',true);return;}
     try{
       const settings=cleanBridgeSettings(m.settings);
@@ -246,6 +249,9 @@ function panel() {`);
       b.phase==='running'?el('div',{className:'alec-pair'},el('p',{textContent:b.url}),el('strong',{textContent:b.code}),el('p',{textContent:'Código de emparelhamento actual · '+b.version})):null,
       row('Pasta do projecto ALEC Remote V16','project','C:\\\\...\\\\ALEC_Remote_V16'),row('Executável Python / py.exe','python','C:\\\\Windows\\\\py.exe'),
       el('label',{className:'alec-bridge-field'},el('span',{textContent:'Interface de rede privada'}),el('select',{disabled:locked,value:d.bind,on:{change:e=>{d.bind=e.target.value;}}},...addresses.map(value=>el('option',{value,selected:d.bind===value,textContent:value+(value.startsWith('127.')?' · Só PC':'')})))),
+      row('Pasta V16 original para importar (opcional)','importProject'),
+      btn('Ler pastas do script pessoal',()=>{document.activeElement?.blur();send({type:'alec_bridge_import',project:d.importProject||d.project});},{disabled:locked}),
+      b.importedRoots?.length?el('div',{className:'group'},el('p',{textContent:b.importedRoots.length+' pastas encontradas. Reveja antes de adicionar.'}),...b.importedRoots.map(p=>el('p',{textContent:p})),btn('Adicionar à lista de leitura',()=>{d.roots=[...new Set([...d.roots.filter(Boolean),...b.importedRoots])].slice(0,32);render('bridge-add-root');},{disabled:locked})):null,
       roots,row('Pasta de recepção (upload opcional)','transfer','Vazio = desactivado'),
       check('Permitir Ask remoto com ferramentas gerais (não limitado pelas pastas acima)','ask'),
       el('p',{textContent:'Os limites de pastas aplicam-se apenas à API de ficheiros. Ask remoto pode usar ferramentas gerais do agente; mantenha-o desligado para limitar o acesso directo.'}),
