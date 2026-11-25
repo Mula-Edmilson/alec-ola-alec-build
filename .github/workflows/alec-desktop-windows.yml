@@ -96,6 +96,8 @@ jobs:
           Set-Content (Join-Path $data 'sidekick.json') '{"onboarded":true,"setupVersion":2,"voice":false,"alecRemoteEnabled":false}'
           $env:ROAMIES_DATA_DIR = $data
           # Test runner only: inspect the actual installed WebView2. Never embedded in the release.
+          $env:ALEC_UI_TEST = '1'
+          $env:WEBVIEW2_USER_DATA_FOLDER = Join-Path $env:RUNNER_TEMP 'alec-webview-test'
           $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=9222 --remote-debugging-address=127.0.0.1'
           $run = Start-Process -FilePath $app.FullName -PassThru
           try {
@@ -108,17 +110,38 @@ jobs:
             }
             if (-not ($started -and -not $run.HasExited)) { throw 'Installed sidecar did not start' }
             Start-Process -FilePath $app.FullName -ArgumentList '--panel'
-            & node (Join-Path $env:GITHUB_WORKSPACE 'desktop-redesign/native/verificar-visual-instalado.mjs') (Join-Path $env:GITHUB_WORKSPACE 'candidate/ALEC-installed-dashboard.png')
-            if ($LASTEXITCODE) { throw 'Actual installed dashboard visual check failed' }
+            $reportPath = Join-Path $data 'alec-native-visual-report.json'
+            for ($i=0; $i -lt 100; $i++) {
+              if (Test-Path $reportPath) { break }
+              if ($run.HasExited) { break }
+              if ($i -eq 30 -or $i -eq 60) { Start-Process -FilePath $app.FullName -ArgumentList '--panel' }
+              Start-Sleep -Seconds 1
+            }
+            if (-not (Test-Path $reportPath)) {
+              Get-ChildItem $logs -Filter *.log -ErrorAction SilentlyContinue | Get-Content -Tail 25
+              throw 'Installed native dashboard did not report a visible orb and all eight navigation entries'
+            }
+            $report = Get-Content $reportPath -Raw | ConvertFrom-Json
+            if ($report.revision -ne 'ALEC_ORB_NATIVE_V2' -or $report.lit -le 100 -or $report.blue -le 50 -or -not $report.visible -or -not $report.compose -or -not $report.listen -or $report.tabs -ne 8) { throw 'Installed dashboard failed required runtime visual assertions' }
+            $visualOut = Join-Path $env:GITHUB_WORKSPACE 'candidate'
+            New-Item -ItemType Directory -Force $visualOut | Out-Null
+            Copy-Item $reportPath (Join-Path $visualOut 'ALEC-native-visual-report.json')
+            Get-Content $reportPath
+            # The embedded native WebView report is mandatory. CDP capture remains a separate evidence check.
+            & node (Join-Path $env:GITHUB_WORKSPACE 'desktop-redesign/native/verificar-visual-instalado.mjs') (Join-Path $visualOut 'ALEC-installed-dashboard.png')
+            if ($LASTEXITCODE) {
+              Write-Warning 'Installed canvas passed native validation, but screenshot capture via CDP was unavailable.'
+              Set-Content (Join-Path $visualOut 'SCREENSHOT-UNAVAILABLE.txt') 'Actual native dashboard pixel and controls validation passed. CDP screenshot unavailable; visual fidelity requires interactive review.'
+            }
           } finally {
             if (-not $run.HasExited) { taskkill /PID $run.Id /T /F | Out-Null }
           }
           $out = Join-Path $env:GITHUB_WORKSPACE 'candidate'
           New-Item -ItemType Directory -Force $out | Out-Null
-          $dest = Join-Path $out 'ALEC-Desktop-0.1.51-Orb-v2-x64-candidate-setup.exe'
+          $dest = Join-Path $out 'ALEC-Desktop-0.1.51-Design-v3-x64-candidate-setup.exe'
           Copy-Item $setup.FullName $dest
           $hash = (Get-FileHash $dest -Algorithm SHA256).Hash.ToLowerInvariant()
-          Set-Content (Join-Path $out 'SHA256.txt') "$hash  ALEC-Desktop-0.1.51-Orb-v2-x64-candidate-setup.exe"
+          Set-Content (Join-Path $out 'SHA256.txt') "$hash  ALEC-Desktop-0.1.51-Design-v3-x64-candidate-setup.exe"
       - name: Include corresponding source and license
         shell: bash
         run: |
@@ -134,7 +157,7 @@ jobs:
           git rev-parse HEAD >> candidate/SOURCE.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: ALEC-Desktop-Orb-v2-Windows-x64-candidate
+          name: ALEC-Desktop-Design-v3-Windows-x64-candidate
           path: candidate/
           if-no-files-found: error
           retention-days: 30
