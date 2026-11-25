@@ -9,6 +9,7 @@ assert.equal(git('rev-parse','HEAD').trim(),'362645466349f4c520ad453d94a94c24817
 const allowed=new Set([
  'showcase/tauri/sidecar/sidekick.mjs','showcase/tauri/sidecar/speaker.mjs',
  'showcase/tauri/sidecar/test/prompt.test.mjs',
+ 'showcase/tauri/sidecar/test/snooze.test.mjs',
  'showcase/tauri/sidecar/fish.mjs','showcase/tauri/sidecar/local.mjs',
  'showcase/panel/index.html','showcase/panel/panel.js','showcase/panel/panel.css',
  'showcase/roamies/12-sidekick.js','showcase/roamies/jarvis.js','showcase/desktop.html','showcase/onboarding/onboarding.js',
@@ -41,4 +42,5 @@ assert.ok(after('showcase/tauri/src-tauri/voice-win/src/wake.rs').includes('fn t
 assert.ok(after('showcase/tauri/src-tauri/voice-win/src/main.rs').includes('Some("wake_phrase")'),'Missing helper protocol');
 // Only strengthen the one known assertion; the rest of the upstream test must remain byte-identical after newline normalization.
 assert.equal(after("showcase/tauri/sidecar/test/prompt.test.mjs"),before("showcase/tauri/sidecar/test/prompt.test.mjs").replace("assert.match(side, /const agentish = !intro && !news && wantsAgent\\(text\\);/, 'a news turn never hatches an agent');","assert.match(side, /const agentish = !alecConversationNow\\(\\) && !intro && !news && wantsAgent\\(text\\);/, 'neither a conversation-only model nor a news turn hatches an agent');"));
+assert.equal(after("showcase/tauri/sidecar/test/snooze.test.mjs"),before("showcase/tauri/sidecar/test/snooze.test.mjs").replace("const args = /running\\.then\\(\\(\\) => prompt\\(([^)]*)\\)\\)/.exec(side)[1].split(',').map((a) => a.trim());","const call = /running\\.then\\(\\(\\) => alecContext\\.run\\(remoteDevice, async \\(\\) => \\{ alecBegin\\(remoteId\\); try \\{ return await prompt\\(([^)]*)\\); \\} catch\\(e\\) \\{ if\\(remoteId\\) alecFailed=true; throw e; \\} finally \\{ alecFinish\\(remoteId\\); \\} \\}\\)\\)/.exec(side);\n  assert.ok(call, 'enqueue calls prompt inside the remote context and finalizes the receipt');\n  const args = call[1].split(',').map((a) => a.trim());"));
 console.log('Parity source gate OK: '+protectedPaths.length+' original tracked paths protected; all native script references preserved. Runtime behavior still requires tests.');
