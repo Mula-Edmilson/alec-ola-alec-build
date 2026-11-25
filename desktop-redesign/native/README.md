@@ -54,3 +54,36 @@ General > ALEC Remote mostra se o hook está pronto, se a mailbox está sinaliza
 Obter a pasta de código Bridge da versão instalada (servidor, módulos e scripts de arranque/instalação), sem memória, logs, credenciais, códigos de emparelhamento ou dados privados. Integrar arranque/paragem, verificação de saúde, emparelhamento, revogação, permissões por directório e execução de ferramentas remotas. A autorização deve ser aplicada tanto às operações directas do Bridge como às ferramentas do agente: negar por defeito, resolver caminhos e junções NTFS, impedir fugas através de comandos arbitrários, testar travessia, links e revogação. Adaptadores CLI/Python/MCP para repositórios genéricos exigem aprovação, dependências fixadas, isolamento efectivo e testes. Não anunciar nenhuma destas capacidades como disponível antes de integrar e validar.
 
 A branch main e a instalação do utilizador não foram alteradas. Ainda não existe instalador personalizado publicado.
+
+
+## Bridge V16 gerido pelo ALEC Desktop
+
+### Base recuperada
+O ZIP V16 fornecido contém o Bridge Python, recursos web, scripts de captura e leitura de chaves DPAPI, integração V11 e código Android. O hook V11 do ZIP coincide com o prefixo do sidekick privado auditado; este último passou novamente node --check. O script pessoal contém 18 directórios literais: o importador foi testado sobre esse script local sem imprimir ou publicar os caminhos. O APK e protocolo V16 não foram alterados.
+
+### Integração de fontes
+- `alec-bridge-supervisor.mjs` verifica SHA-256 de 36 ficheiros do Bridge V16 e copia exclusivamente esses recursos para uma pasta temporária; executa Python 3.10+ como processo filho, sem shell e sem elevação. Não copia o script de pastas pessoais, dados, credenciais, sessões, modelos, logs nem o APK.
+- O servidor usa a interface IPv4 privada escolhida, porta 8765. Só apresenta o código de emparelhamento depois de o servidor confirmar a abertura da porta e configuração. O código não é guardado em configuração nem escrito em logs pelo supervisor. Parar/reiniciar o servidor termina as suas sessões; o fecho do pipe do processo pai solicita o encerramento do filho.
+- No painel General > Bridge V16: configurar pasta do projecto (detectada se empacotada), executável Python (detectado para alguns caminhos do launcher), interface privada, leitura de pastas, pasta de recepção, Ask, ecrã, webcam, parâmetros de visão e arranque automático. Guardar, Iniciar e Parar não requerem comandos PowerShell manuais. A primeira configuração exige Python funcional e selecção/validação da interface. Não instala Python nem OpenCV e não abre firewall automaticamente.
+- Importação local das pastas do script pessoal V16: lê apenas a lista literal, não executa o script; mostra as pastas para revisão e só aplica depois de adicionar à lista e guardar. As pastas conhecidas implícitas em -Ficheiros e o destino de recepção são configurados separadamente. Nenhum caminho pessoal foi publicado.
+- A API directa do Bridge continua a usar as verificações V16 para leitura, pesquisa, download e recepção de ficheiros sem sobrescrever. Pastas e permissões novas são aplicadas no próximo arranque do Bridge. Ask remoto com ferramentas gerais está desligado por defeito na configuração gerida. Se activado explicitamente, **não é limitado pelas pastas da API de ficheiros**; um sandbox integral de ferramentas do agente continua pendente. Parar o serviço não cancela tarefas que o agente já recebeu. O serviço gerido não adopta nem termina um Bridge externo iniciado por outro processo; um conflito na porta impede o arranque.
+- A transformação opcional inclui o Bridge no mapa de recursos Tauri. O modo de empacotamento é local e depende do ZIP fornecido; não foi publicada a cópia pessoal nem criada uma release. O instalador ainda não inclui um runtime Python próprio.
+
+### Preparar a build com os recursos do Bridge
+O comando de preparação para desenvolvimento (em checkout descartável) passa a aceitar a pasta V16 extraída como terceiro argumento:
+```powershell
+node .\preparar-fonte.mjs .\ALEC-source-0151 "$env:LOCALAPPDATA\Roamies\sidecar\sidekick.mjs" "C:\caminho\ALEC_Remote_V16"
+```
+O script valida o bundle privado e as âncoras de transformação. A preparação inclui os recursos auditados, mas não compila nem instala a aplicação. Não publicar o checkout personalizado com valores privados.
+
+### Testes executados
+- 101 testes Python originais V16 passaram no ambiente Linux.
+- 4 testes adicionais sobre um runner local equivalente ao processo gerido passaram (servidor/HTTP, emparelhamento e pastas, encerramento por stdin, rejeição de pasta inexistente, endereço público/wildcard e conflito de porta). Total: 105 testes Python. O supervisor Node e o runner incorporado ainda precisam de ser testados juntos no Windows real.
+- Testes JavaScript originais do ZIP passaram: hook V11, 20 casos de routing de ficheiros, interface, ownership de áudio nativo e 14 casos de routing de visão.
+- 4 testes sintéticos do parser de pastas passaram e 18 entradas foram extraídas do script real sem executar PowerShell.
+- 80 âncoras contra fontes oficiais v0.1.51 (com perfil sintético e fixture da âncora do hook) e 14 ficheiros transformados/gerados; sintaxe do painel transformado e do supervisor verificada em JavaScript. Mapa Tauri de recursos validado. Ainda não foi efectuada build ou execução end-to-end no Windows.
+
+### Pendências
+Compilar Tauri/NSIS, validar ligação com APK Android V16, Python/DPAPI/webcam, compatibilidade do helper Hello Alex, isolamento integral das ferramentas Ask, migração privada de dados/voz separada de uma release pública, adaptadores executáveis de Skill Hub e catálogo Cloudflare. Validar também arranque automático, paragem e reinício no Windows e resolução de conflitos com Roamies antigo.
+
+A versão estável e a instalação actual não foram modificadas. Não há instalador ALEC personalizado validado publicado.
