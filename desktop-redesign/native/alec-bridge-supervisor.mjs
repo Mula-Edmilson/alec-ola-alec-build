@@ -34,6 +34,28 @@ export function pythonDefault(){
   const known=[win&&path.join(win,'py.exe'),local&&path.join(local,'Programs','Python','Launcher','py.exe')].filter(Boolean);
   return known.find(p=>fs.existsSync(p))||'';
 }
+
+export function parsePersonalFolders(text){
+  if(typeof text!=='string'||text.length>65536)throw Error('Script inválido.');
+  const matches=[...text.matchAll(/^\s*\$pastas\s*=\s*@\(\s*\r?\n([\s\S]*?)^\s*\)\s*$/gm)];
+  if(matches.length!==1)throw Error('Lista de pastas V16 não encontrada.');
+  const values=matches[0][1].split(/\r?\n/).filter(line=>line.trim()).map(line=>{
+    const m=/^\s*'((?:[^']|'')+)'\s*,?\s*$/.exec(line);
+    if(!m)throw Error('A lista contém uma expressão; não será executada.');
+    const p=m[1].replace(/''/g,"'");
+    if(!/^[A-Za-z]:[\\/]/.test(p)||p.includes('\0')||p.length>1000||p.includes('$'))throw Error('Caminho não literal.');
+    return p;
+  });
+  if(!values.length||values.length>32)throw Error('Quantidade de pastas inválida.');
+  return [...new Set(values)];
+}
+export function readPersonalFolders(project){
+  if(typeof project!=='string'||!path.isAbsolute(project)||project.length>1000)throw Error('Indique a pasta original V16.');
+  const file=path.join(project,'Iniciar-ALEC-Pessoal.ps1'),st=fs.lstatSync(file);
+  if(!st.isFile()||st.size>65536)throw Error('Script pessoal indisponível.');
+  return parsePersonalFolders(fs.readFileSync(file,'utf8'));
+}
+
 export function privateIPv4(ip){
   if(typeof ip!=='string'||!/^\d{1,3}(?:\.\d{1,3}){3}$/.test(ip))return false;
   const [a,b,c,d]=ip.split('.').map(Number);
