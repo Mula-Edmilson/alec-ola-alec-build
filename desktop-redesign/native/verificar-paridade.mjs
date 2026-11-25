@@ -26,7 +26,7 @@ for(const line of git('diff','--name-status','HEAD').trim().split('\n').filter(B
  assert.equal(status,'M','No native source deletion, rename or replacement allowed: '+line);
  assert.ok(allowed.has(file),'Unexpected modification: '+file);
 }
-const newAllowed=new Set(['showcase/tauri/sidecar/alec-voice-preference.mjs','showcase/panel/alec-theme.css','showcase/tauri/sidecar/alec-bridge-supervisor.mjs','showcase/tauri/sidecar/alec-skill-hub.mjs','showcase/tauri/sidecar/alec-legacy-profile.mjs','showcase/tauri/sidecar/alec-wake-phrase.mjs','showcase/tauri/sidecar/test/alec-wake-phrase.test.mjs']);
+const newAllowed=new Set(['showcase/tauri/sidecar/alec-local-context.mjs','showcase/tauri/sidecar/alec-voice-preference.mjs','showcase/panel/alec-theme.css','showcase/tauri/sidecar/alec-bridge-supervisor.mjs','showcase/tauri/sidecar/alec-skill-hub.mjs','showcase/tauri/sidecar/alec-legacy-profile.mjs','showcase/tauri/sidecar/alec-wake-phrase.mjs','showcase/tauri/sidecar/test/alec-wake-phrase.test.mjs']);
 for(const f of git('ls-files','--others','--exclude-standard').trim().split('\n').filter(Boolean))assert.ok(newAllowed.has(f),'Unexpected added source: '+f);
 const before=f=>git('show','HEAD:'+f).replace(/\r\n/g,'\n');
 const after=f=>readFileSync(path.join(root,f),'utf8').replace(/\r\n/g,'\n');
@@ -61,7 +61,10 @@ assert.ok(shell.includes('.skip_taskbar(true)')&&shell.includes('hide_panel(&app
 assert.ok(source.includes('if(!config.alecCursorV4){delete config.avatarPin;config.alecCursorV4=true;}')&&!source.includes("config.avatarPin={corner:'bottom-right'"),'Do not force pin on cursor-follow avatar');
 assert.ok(!source.includes('setTimeout(() => checkUpdates(), 20_000)')&&!source.includes("send({ type: 'update', install: false })"),'Do not query incompatible updater');
 assert.ok(after('showcase/panel/alec-theme.css').includes('.alec-bridge-check input[type=checkbox]'),'Remote checkbox layout fix required');
-assert.ok(!panelSource.includes('Digital Reach Out')&&!after('showcase/panel/index.html').includes('By Ken Kai'),'Remove commercial branding from visible dashboard');
+assert.ok(panelSource.includes('Edmilson Mula')&&panelSource.includes('Digital Reach Out · Design e desenvolvimento')&&!after('showcase/panel/index.html').includes('By Ken Kai'),'Restore ALEC author only in About');
+assert.ok(shell.includes('KEY, "/v", "ALEC"')&&!shell.includes('KEY, "/v", "Roamies"'),'Independent Windows startup registration');
+assert.ok(source.includes('fitLocalText(alecConversationHistory(msgs)')&&source.includes('alecTextSession.base,...received.slice(at)'),'Bound local context, preserve saved history');
+assert.ok(after('showcase/panel/alec-theme.css').includes('#pane-conversations .alec-history{overflow:visible!important'),'Use same scrolling surface');
 assert.ok(panelSource.includes('Baseado em Roamies (AGPL-3.0)')&&!panelSource.includes("group('Help'"),'Minimal About and no Help');
 assert.ok(orbSource.includes('ALEC_PLASMA_V6')&&orbSource.includes('ctx.clip()'),'Internal animated plasma');
 assert.equal(readFileSync(path.join(root,'showcase/tauri/src-tauri/icons/icon.ico')).readUInt16LE(4),9,'Official multi-size ICO');
