@@ -7,6 +7,7 @@ const root=path.resolve(process.argv[2]||'upstream');
 const git=(...a)=>execFileSync('git',['-C',root,...a],{encoding:'utf8',maxBuffer:16*1024*1024});
 assert.equal(git('rev-parse','HEAD').trim(),'362645466349f4c520ad453d94a94c2481776c2f');
 const allowed=new Set([
+ "showcase/tauri/src-tauri/icons/icon.ico","showcase/tauri/src-tauri/icons/32x32.png","showcase/tauri/src-tauri/icons/128x128.png","showcase/tauri/src-tauri/icons/128x128@2x.png","showcase/tauri/src-tauri/icons/icon.png","showcase/tauri/src-tauri/icons/icon.icns",
  'showcase/tauri/sidecar/sidekick.mjs','showcase/tauri/sidecar/speaker.mjs',
  'showcase/tauri/sidecar/test/prompt.test.mjs',
  'showcase/tauri/sidecar/test/snooze.test.mjs',
@@ -46,7 +47,7 @@ assert.ok(after('showcase/tauri/src-tauri/voice-win/src/main.rs').includes('Some
 assert.equal(after("showcase/tauri/sidecar/test/prompt.test.mjs"),before("showcase/tauri/sidecar/test/prompt.test.mjs").replace("assert.match(side, /const agentish = !intro && !news && wantsAgent\\(text\\);/, 'a news turn never hatches an agent');","assert.match(side, /const agentish = !alecConversationNow\\(\\) && !intro && !news && wantsAgent\\(text\\);/, 'neither a conversation-only model nor a news turn hatches an agent');"));
 assert.equal(after("showcase/tauri/sidecar/test/snooze.test.mjs"),before("showcase/tauri/sidecar/test/snooze.test.mjs").replace("const args = /running\\.then\\(\\(\\) => prompt\\(([^)]*)\\)\\)/.exec(side)[1].split(',').map((a) => a.trim());","const call = /running\\.then\\(\\(\\) => alecContext\\.run\\(remoteDevice, async \\(\\) => \\{ alecBegin\\(remoteId\\); try \\{ return await prompt\\(([^)]*)\\); \\} catch\\(e\\) \\{ if\\(remoteId\\) alecFailed=true; throw e; \\} finally \\{ alecFinish\\(remoteId\\); \\} \\}\\)\\)/.exec(side);\n  assert.ok(call, 'enqueue calls prompt inside the remote context and finalizes the receipt');\n  const args = call[1].split(',').map((a) => a.trim());"));
 const panelSource=after('showcase/panel/panel.js'),orbSource=after('showcase/roamies/jarvis.js'),desktopSource=after('showcase/roamies/10-dither.js');
-assert.ok(orbSource.includes("revision:'ALEC_ORB_NATIVE_V5'"),'Approved native particle renderer is required');
+assert.ok(orbSource.includes("revision:'ALEC_ORB_NATIVE_V6'"),'Approved native particle renderer is required');
 assert.ok(panelSource.includes("id:'alec-main-orb'")&&panelSource.includes('return [alecDashboard()];')&&panelSource.includes("id:'alec-ask-launch'")&&panelSource.includes("act('ask',true)")&&panelSource.includes("type:'alec_panel_listen'"),'Dashboard must render orb and real native Ask launcher and voice controls');
 assert.ok(desktopSource.includes('window.Roamie.alecOrb.paint(ctx'),'Floating desktop renderer must use smooth orb');
 assert.ok(source.includes("kind:'alec_live'")&&source.includes("m.type==='alec_panel_ask'")&&source.includes("m.type==='alec_panel_listen'"),'Native event routes are required');
@@ -59,7 +60,9 @@ assert.ok(source.includes('if(!config.alecCursorV4){delete config.avatarPin;conf
 assert.ok(!source.includes('setTimeout(() => checkUpdates(), 20_000)')&&!source.includes("send({ type: 'update', install: false })"),'Do not query incompatible updater');
 assert.ok(after('showcase/panel/alec-theme.css').includes('.alec-bridge-check input[type=checkbox]'),'Remote checkbox layout fix required');
 assert.ok(!panelSource.includes('Digital Reach Out')&&!after('showcase/panel/index.html').includes('By Ken Kai'),'Remove commercial branding from visible dashboard');
-assert.ok(panelSource.includes('Créditos técnicos e licenças open source')&&panelSource.includes('https://github.com/KenKaiii/Roamies'),'Original source attribution retained');
+assert.ok(panelSource.includes('Baseado em Roamies (AGPL-3.0)')&&!panelSource.includes("group('Help'"),'Minimal About and no Help');
+assert.ok(orbSource.includes('ALEC_PLASMA_V6')&&orbSource.includes('ctx.clip()'),'Internal animated plasma');
+assert.equal(readFileSync(path.join(root,'showcase/tauri/src-tauri/icons/icon.ico')).readUInt16LE(4),9,'Official multi-size ICO');
 assert.ok(after('showcase/roamies/ask-bar.js').includes("submit.addEventListener('click'"),'Cursor ask send control missing');
 assert.ok(after('showcase/roamies/core.js').includes("R.alecOrbOpen(true)")&&after('showcase/roamies/host.js').includes("invoke('alec_orb_open'"),'Floating orb must open native compact dashboard');
 assert.ok(after('showcase/roamies/ask-bar.js').includes("type:'alec_panel_listen'"),'Floating Ask microphone must use real voice route');
