@@ -5,14 +5,14 @@ on:
     branches: [main]
     types: [opened, synchronize, reopened]
   push:
-    branches: [alec-desktop-redesign]
+    branches: [alec-desktop-redesign, alec-proactive-v7]
     paths:
       - '.github/workflows/alec-desktop-windows.yml'
       - 'desktop-redesign/native/**'
 permissions:
   contents: read
 concurrency:
-  group: alec-desktop-windows
+  group: alec-desktop-windows-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
   build:
@@ -37,6 +37,7 @@ jobs:
         run: |
           node desktop-redesign/native/preparar-fonte.mjs upstream --public
           node desktop-redesign/native/verificar-paridade.mjs upstream
+          node desktop-redesign/native/testar-tailnet.mjs
       - name: Install locked sidecar dependencies
         working-directory: upstream/showcase/tauri/sidecar
         shell: bash
@@ -65,7 +66,7 @@ jobs:
             upstream/showcase/tauri/src-tauri -> target
             upstream/showcase/tauri/src-tauri/voice-win -> target
             upstream/showcase/tauri/src-tauri/hands-win -> target
-          key: alec-windows
+          key: alec-windows-v7-icon
       - name: Install Tauri CLI
         shell: bash
         run: cargo install tauri-cli --version "^2" --locked
@@ -87,6 +88,23 @@ jobs:
           $app = Get-ChildItem (Join-Path $env:LOCALAPPDATA 'ALEC'), (Join-Path $env:ProgramFiles 'ALEC') -Filter roamies.exe -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $app) { throw 'Installed ALEC binary not found' }
           $dir = $app.DirectoryName
+          # Inspect the actual installed EXE's icon (not just the source ICO).
+          Add-Type -AssemblyName System.Drawing
+          $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($app.FullName)
+          if (-not $icon) { throw 'Installed executable icon is absent' }
+          $bitmap = $icon.ToBitmap()
+          $scaled = [System.Drawing.Bitmap]::new($bitmap,32,32)
+          $white = 0; $navy = 0
+          for ($y=0; $y -lt 32; $y++) {
+            for ($x=0; $x -lt 32; $x++) {
+              $c = $scaled.GetPixel($x,$y)
+              if ($c.A -gt 200 -and $c.R -gt 210 -and $c.G -gt 210 -and $c.B -gt 210) { $white++ }
+              if ($c.A -gt 200 -and $c.R -lt 45 -and $c.G -lt 45 -and $c.B -lt 75) { $navy++ }
+            }
+          }
+          $scaled.Dispose(); $bitmap.Dispose(); $icon.Dispose()
+          Write-Host "Installed executable icon: white=$white navy=$navy"
+          if ($white -lt 80 -or $navy -lt 200) { throw 'Installed executable did not expose the official white/navy ALEC icon' }
           $missing = @('roamies-node.exe','roamies-voice.exe','roamies-hands.exe','sidecar/sidekick.mjs','msvcp140.dll','msvcp140_1.dll','vcruntime140.dll','vcruntime140_1.dll','onnxruntime.dll') | Where-Object { -not (Test-Path (Join-Path $dir $_)) }
           if ($missing) { throw "Missing native files: $($missing -join ', ')" }
           & (Join-Path $dir 'roamies-hands.exe') --self-test
@@ -149,10 +167,10 @@ jobs:
           }
           $out = Join-Path $env:GITHUB_WORKSPACE 'candidate'
           New-Item -ItemType Directory -Force $out | Out-Null
-          $dest = Join-Path $out 'ALEC-Desktop-0.1.51-Native-v6-x64-candidate-setup.exe'
+          $dest = Join-Path $out 'ALEC-Desktop-0.1.51-Native-v7.0-x64-candidate-setup.exe'
           Copy-Item $setup.FullName $dest
           $hash = (Get-FileHash $dest -Algorithm SHA256).Hash.ToLowerInvariant()
-          Set-Content (Join-Path $out 'SHA256.txt') "$hash  ALEC-Desktop-0.1.51-Native-v6-x64-candidate-setup.exe"
+          Set-Content (Join-Path $out 'SHA256.txt') "$hash  ALEC-Desktop-0.1.51-Native-v7.0-x64-candidate-setup.exe"
       - name: Include corresponding source and license
         shell: bash
         run: |
@@ -168,7 +186,7 @@ jobs:
           git rev-parse HEAD >> candidate/SOURCE.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: ALEC-Desktop-Native-v6-Windows-x64-candidate
+          name: ALEC-Desktop-Native-v7.0-Windows-x64-candidate
           path: candidate/
           if-no-files-found: error
           retention-days: 30
