@@ -33,3 +33,24 @@ Se a versão ou o hash diferirem, a operação aborta. **Não fazer push do chec
 - Preservar AGPL-3.0, disponibilizar código-fonte correspondente ao instalador e verificar licenças dos recursos. Só publicar instalador depois dos testes.
  
 **Não existe ainda uma release executável ALEC 0.1.51 aprovada.**
+
+
+## Extensões ALEC — 25/11/2026
+
+A transformação de fontes tem agora 72 âncoras únicas e produz/altera 13 ficheiros, verificadas sobre a referência v0.1.51 com um perfil sintético. A âncora de controlo da mailbox existe exactamente uma vez no bundle V11 privado. O JavaScript do painel transformado foi verificado sintacticamente; a compilação Tauri e a execução Windows continuam pendentes.
+
+### Skill Hub
+No painel Abilities > Skill Hub, introduzir a URL HTTPS da raiz de um repositório público GitHub. O motor lê metadados, fixa o SHA do commit, identifica documentos SKILL.md, apresenta o conteúdo e aguarda aprovação explícita (válida durante dez minutos). A importação é exclusivamente documental, usando o motor nativo Roamies. Nenhum script, binário, pacote, dependência ou servidor MCP é instalado por este fluxo. Se o repositório não tiver SKILL.md, indica a necessidade de adaptador; habilidades dependentes de ficheiros auxiliares podem não funcionar. O mecanismo de verificação existente não é garantia de segurança do código. Não confiar em instruções de terceiros que peçam segredos ou execução não autorizada.
+
+Seis testes com dados sintéticos passaram: rejeição de host inválido, conteúdo fixado por SHA e revisão sem instalação, rejeição de aprovação inválida, importação documental aprovada, colisão de nome e expiração. Não foram efectuados testes com repositórios reais através da aplicação Windows.
+
+### Identidade
+Perfis Profissional, Técnico e conciso, Criativo e proactivo, persistidos na configuração local; aplicam-se ao personagem ALEC (look jarvis) incluindo o modo conversação. About apresenta website, GitHub, Instagram e autoria do ALEC, preservando os créditos upstream.
+
+### Remote
+General > ALEC Remote mostra se o hook está pronto, se a mailbox está sinalizada e permite suspender a aceitação de novos pedidos da mailbox V11. Isto não é um supervisor do processo Bridge, confirmação de conexão do telefone, revogação de sessões, cancelamento de tarefas em andamento nem controlo de ficheiros. O Bridge externo continua a ser necessário. Não alterar a política de acesso do Bridge sem o seu código-fonte real.
+
+### Próximos requisitos de integração
+Obter a pasta de código Bridge da versão instalada (servidor, módulos e scripts de arranque/instalação), sem memória, logs, credenciais, códigos de emparelhamento ou dados privados. Integrar arranque/paragem, verificação de saúde, emparelhamento, revogação, permissões por directório e execução de ferramentas remotas. A autorização deve ser aplicada tanto às operações directas do Bridge como às ferramentas do agente: negar por defeito, resolver caminhos e junções NTFS, impedir fugas através de comandos arbitrários, testar travessia, links e revogação. Adaptadores CLI/Python/MCP para repositórios genéricos exigem aprovação, dependências fixadas, isolamento efectivo e testes. Não anunciar nenhuma destas capacidades como disponível antes de integrar e validar.
+
+A branch main e a instalação do utilizador não foram alteradas. Ainda não existe instalador personalizado publicado.
