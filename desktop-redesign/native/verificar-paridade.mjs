@@ -50,7 +50,13 @@ assert.ok(panelSource.includes("id:'alec-main-orb'")&&panelSource.includes('alec
 assert.ok(desktopSource.includes('window.Roamie.alecOrb.paint(ctx'),'Floating desktop renderer must use smooth orb');
 assert.ok(source.includes("kind:'alec_live'")&&source.includes("m.type==='alec_panel_ask'")&&source.includes("m.type==='alec_panel_listen'"),'Native event routes are required');
 assert.ok(panelSource.includes("const ALEC_TOP=['home','conversations','vision','memory','remote','abilities','settings','about']"),'Approved navigation required');
-assert.ok(panelSource.includes("placeholder:'Ask me anything…'")&&panelSource.includes("invoke('alec_panel_compact'")&&panelSource.includes("type:'alec_visual_report'"),'Native compact, Ask and visual verification required');
+assert.ok(panelSource.includes("id:'alec-ask-launch'")&&panelSource.includes("act('ask',true)")&&panelSource.includes("type:'alec_visual_report'")&&!panelSource.includes("id:'alec-ask-input'"),'Single native Ask bar: no duplicate Home composer');
+const shell=after('showcase/tauri/src-tauri/src/main.rs');
+assert.ok(shell.includes('const PANEL_W: f64 = 380.0;')&&shell.includes('const PANEL_H: f64 = 470.0;')&&!shell.includes('fn alec_panel_compact('),'One compact window, no expanded alternative');
+assert.ok(shell.includes('.skip_taskbar(true)')&&shell.includes('hide_panel(&app2, "blur")'),'Popup closes on loss of focus');
+assert.ok(source.includes('if(!config.alecCursorV4){delete config.avatarPin;config.alecCursorV4=true;}')&&!source.includes("config.avatarPin={corner:'bottom-right'"),'Do not force pin on cursor-follow avatar');
+assert.ok(!source.includes('setTimeout(() => checkUpdates(), 20_000)')&&!source.includes("send({ type: 'update', install: false })"),'Do not query incompatible updater');
+assert.ok(after('showcase/panel/alec-theme.css').includes('.alec-bridge-check input[type=checkbox]'),'Remote checkbox layout fix required');
 assert.ok(!panelSource.includes('Digital Reach Out')&&!after('showcase/panel/index.html').includes('By Ken Kai'),'Remove commercial branding from visible dashboard');
 assert.ok(panelSource.includes('Créditos técnicos e licenças open source')&&panelSource.includes('https://github.com/KenKaiii/Roamies'),'Original source attribution retained');
 assert.ok(after('showcase/roamies/ask-bar.js').includes("submit.addEventListener('click'"),'Cursor ask send control missing');
