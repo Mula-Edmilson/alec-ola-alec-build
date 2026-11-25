@@ -25,7 +25,7 @@ for(const line of git('diff','--name-status','HEAD').trim().split('\n').filter(B
  assert.equal(status,'M','No native source deletion, rename or replacement allowed: '+line);
  assert.ok(allowed.has(file),'Unexpected modification: '+file);
 }
-const newAllowed=new Set(['showcase/panel/alec-theme.css','showcase/tauri/sidecar/alec-bridge-supervisor.mjs','showcase/tauri/sidecar/alec-skill-hub.mjs','showcase/tauri/sidecar/alec-legacy-profile.mjs','showcase/tauri/sidecar/alec-wake-phrase.mjs','showcase/tauri/sidecar/test/alec-wake-phrase.test.mjs']);
+const newAllowed=new Set(['showcase/tauri/sidecar/alec-voice-preference.mjs','showcase/panel/alec-theme.css','showcase/tauri/sidecar/alec-bridge-supervisor.mjs','showcase/tauri/sidecar/alec-skill-hub.mjs','showcase/tauri/sidecar/alec-legacy-profile.mjs','showcase/tauri/sidecar/alec-wake-phrase.mjs','showcase/tauri/sidecar/test/alec-wake-phrase.test.mjs']);
 for(const f of git('ls-files','--others','--exclude-standard').trim().split('\n').filter(Boolean))assert.ok(newAllowed.has(f),'Unexpected added source: '+f);
 const before=f=>git('show','HEAD:'+f).replace(/\r\n/g,'\n');
 const after=f=>readFileSync(path.join(root,f),'utf8').replace(/\r\n/g,'\n');
@@ -55,7 +55,7 @@ assert.ok(source.includes("kind:'alec_live'")&&source.includes("m.type==='alec_p
 assert.ok(panelSource.includes("const ALEC_TOP=['home','conversations','vision','memory','remote','abilities','settings','about']"),'Approved navigation required');
 assert.ok(panelSource.includes("id:'alec-ask-launch'")&&panelSource.includes("act('ask',true)")&&panelSource.includes("type:'alec_visual_report'")&&!panelSource.includes("id:'alec-ask-input'"),'Single native Ask bar: no duplicate Home composer');
 const shell=after('showcase/tauri/src-tauri/src/main.rs');
-assert.ok(shell.includes('const PANEL_W: f64 = 380.0;')&&shell.includes('const PANEL_H: f64 = 470.0;')&&!shell.includes('fn alec_panel_compact('),'One compact window, no expanded alternative');
+assert.ok(shell.includes('const PANEL_W: f64 = 400.0;')&&shell.includes('const PANEL_H: f64 = 470.0;')&&!shell.includes('fn alec_panel_compact('),'One compact window, no expanded alternative');
 assert.ok(shell.includes('.skip_taskbar(true)')&&shell.includes('hide_panel(&app2, "blur")'),'Popup closes on loss of focus');
 assert.ok(source.includes('if(!config.alecCursorV4){delete config.avatarPin;config.alecCursorV4=true;}')&&!source.includes("config.avatarPin={corner:'bottom-right'"),'Do not force pin on cursor-follow avatar');
 assert.ok(!source.includes('setTimeout(() => checkUpdates(), 20_000)')&&!source.includes("send({ type: 'update', install: false })"),'Do not query incompatible updater');
@@ -78,4 +78,7 @@ assert.ok(source.includes("async function startAlecTailnet")&&source.includes("a
 assert.ok(panelSource.includes("role:'switch'")&&panelSource.includes("alec_bridge_tailnet_start")&&panelSource.includes("alec_bridge_stop"),'Native Bridge toggle');
 assert.ok(after(core+'alec-bridge-supervisor.mjs').includes("status','--json'")&&after(core+'alec-bridge-supervisor.mjs').includes("settings.tailnet?'100.64.0.0/10'"),'Authenticated tailnet state and private bind');
 assert.ok(after('showcase/tauri/src-tauri/build.rs').includes('window_icon_path("icons/icon.ico")'),'PE icon explicitly bound');
+assert.ok(source.includes('alecVoicePreference.get()')&&source.includes("alec_fish_reference_save")&&source.includes("execute: async () => aboutAlec("),'Independent voice settings and actual ALEC manual');
+assert.ok(panelSource.includes('Voz personalizada · Fish Audio')&&panelSource.includes("alec_fish_reference_save"),'Editable Fish Audio reference field');
+assert.ok(source.includes("['ultren', 'Amilcar',")&&!source.includes('your name is Ultren'),'Rename character without changing internal key');
 console.log('Parity source gate OK: '+protectedPaths.length+' original tracked paths protected; all native script references preserved. Runtime behavior still requires tests.');
