@@ -40,11 +40,11 @@ try{
  for(let i=0;i<45;i++){
   const r=await call('Runtime.evaluate',{expression,returnByValue:true});
   report=r.result?.value;
-  if(report?.ready&&report.revision==='ALEC_ORB_NATIVE_V2'&&report.lit>100&&report.blue>50&&report.visible==='1')break;
+  if(report?.ready&&report.revision==='ALEC_ORB_NATIVE_V5'&&report.lit>100&&report.blue>50&&report.visible==='1')break;
   await sleep(1000);
  }
  console.log(JSON.stringify(report,null,2));
- assert.ok(report?.ready&&report.revision==='ALEC_ORB_NATIVE_V2','Wrong or absent native renderer');
+ assert.ok(report?.ready&&report.revision==='ALEC_ORB_NATIVE_V5','Wrong or absent native renderer');
  assert.ok(report.lit>100&&report.blue>50&&report.visible==='1','Installed orb did not render visibly');
  assert.ok(report.compose&&report.noHomeInput&&report.listen&&report.tabs===8&&report.windowWidth<=400&&report.windowHeight<=490,'Dashboard controls or tabs missing');
  const screenshot=await call('Page.captureScreenshot',{format:'png',fromSurface:true});
