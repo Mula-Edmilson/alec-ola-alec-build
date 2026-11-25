@@ -1,6 +1,9 @@
 name: ALEC Desktop Windows candidate
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
   push:
     branches: [alec-desktop-redesign]
     paths:
@@ -13,12 +16,14 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
+    if: github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'alec-desktop-redesign')
     runs-on: windows-latest
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v7
         with:
           node-version: 24
