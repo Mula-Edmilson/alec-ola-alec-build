@@ -8,6 +8,7 @@ const git=(...a)=>execFileSync('git',['-C',root,...a],{encoding:'utf8',maxBuffer
 assert.equal(git('rev-parse','HEAD').trim(),'362645466349f4c520ad453d94a94c2481776c2f');
 const allowed=new Set([
  'showcase/tauri/sidecar/sidekick.mjs','showcase/tauri/sidecar/speaker.mjs',
+ 'showcase/tauri/sidecar/test/prompt.test.mjs',
  'showcase/tauri/sidecar/fish.mjs','showcase/tauri/sidecar/local.mjs',
  'showcase/panel/index.html','showcase/panel/panel.js','showcase/panel/panel.css',
  'showcase/roamies/12-sidekick.js','showcase/roamies/jarvis.js','showcase/desktop.html','showcase/onboarding/onboarding.js',
@@ -38,4 +39,6 @@ assert.ok(source.includes('alecContext.run(remoteDevice'),'Remote context missin
 assert.ok(after('showcase/tauri/src-tauri/voice-win/src/wake.rs').includes('fn full_phrase_custom_and_native_fallback()'),'Missing wake phrase regression test');
 assert.ok(after('showcase/tauri/src-tauri/voice-win/src/wake.rs').includes('fn the_phrase_and_its_near_misses()'),'Missing original wake tests');
 assert.ok(after('showcase/tauri/src-tauri/voice-win/src/main.rs').includes('Some("wake_phrase")'),'Missing helper protocol');
+// Only strengthen the one known assertion; the rest of the upstream test must remain byte-identical after newline normalization.
+assert.equal(after("showcase/tauri/sidecar/test/prompt.test.mjs"),before("showcase/tauri/sidecar/test/prompt.test.mjs").replace("assert.match(side, /const agentish = !intro && !news && wantsAgent\\(text\\);/, 'a news turn never hatches an agent');","assert.match(side, /const agentish = !alecConversationNow\\(\\) && !intro && !news && wantsAgent\\(text\\);/, 'neither a conversation-only model nor a news turn hatches an agent');"));
 console.log('Parity source gate OK: '+protectedPaths.length+' original tracked paths protected; all native script references preserved. Runtime behavior still requires tests.');
