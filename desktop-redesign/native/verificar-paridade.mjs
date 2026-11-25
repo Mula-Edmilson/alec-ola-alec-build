@@ -14,6 +14,7 @@ const allowed=new Set([
  'showcase/panel/index.html','showcase/panel/panel.js','showcase/panel/panel.css',
  'showcase/roamies/12-sidekick.js','showcase/roamies/jarvis.js','showcase/roamies/10-dither.js','showcase/desktop.html','showcase/onboarding/onboarding.js',
  'showcase/tauri/src-tauri/tauri.conf.json','showcase/tauri/src-tauri/src/main.rs',
+ 'showcase/tauri/src-tauri/src/voice.rs',
  'showcase/tauri/src-tauri/voice-win/src/main.rs','showcase/tauri/src-tauri/voice-win/src/wake.rs'
 ]);
 for(const line of git('diff','--name-status','HEAD').trim().split('\n').filter(Boolean)){
