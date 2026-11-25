@@ -184,6 +184,79 @@ const system = () => (config.lite ? litePrompt() : stablePrompt()) + (config.loo
       profile ? group('Personalidade ALEC', 'Aplica-se ao personagem ALEC. Não altera permissões nem os restantes personagens.', null,
         el('span',{className:'px field select'},el('select',{'aria-label':'Personalidade ALEC','data-k':'alec-persona',disabled:state.busy,on:{change:e=>send({type:'alec_persona',profile:e.target.value})}},
           ...[['balanced','Profissional'],['concise','Técnico e conciso'],['creative','Criativo e proactivo']].map(([value,label])=>el('option',{value,textContent:label,selected:profile===value}))))) : null,`);
+
+  // The managed Bridge is the actual V16 server from the user's local extracted project.
+  if(typeof profile.bridgeSupervisor!=='string'||!profile.bridgeSupervisor.includes('createBridgeSupervisor'))throw Error('Bridge supervisor module missing.');
+  out["showcase/tauri/sidecar/alec-bridge-supervisor.mjs"]=profile.bridgeSupervisor;
+  out[sc]="import { createBridgeSupervisor, cleanBridgeSettings } from './alec-bridge-supervisor.mjs';\n"+out[sc];
+  rep(sc,"function panel() {",`const alecBridge = createBridgeSupervisor({
+  changed: () => panel(),
+  ready: settings => {
+    if(settings.ask){
+      alecFs.mkdirSync(alecDir,{recursive:true,mode:0o700});
+      alecFs.closeSync(alecFs.openSync(alecPath.join(alecDir,'enabled'),'a',0o600));
+    }
+    config.alecRemoteEnabled=settings.ask; saveConfig();
+  },
+  closed: () => {config.alecRemoteEnabled=false;saveConfig();}
+});
+function startAlecBridge(settings){
+  if(!['stopped','error'].includes(alecBridge.snapshot().phase))throw Error('Pare o serviço antes de iniciar novamente.');
+  const valid=cleanBridgeSettings(settings);
+  config.alecRemoteEnabled=false;saveConfig();
+  const saved=alecBridge.start(valid);config.alecBridge=saved;saveConfig();panel();
+}
+function panel() {`);
+  rep(sc,"alecRemote: { runtimeReady:", "alecManagedBridge: { ...alecBridge.snapshot(), settings: config.alecBridge ?? null }, alecRemote: { runtimeReady:");
+  rep(sc,"else if (m.type === 'alec_remote_access'",`else if (m.type === 'alec_bridge_save' || m.type === 'alec_bridge_start') {
+    if(!['stopped','error'].includes(alecBridge.snapshot().phase)){panelNote('Pare o Bridge antes de alterar configurações.',true);return;}
+    try{
+      const settings=cleanBridgeSettings(m.settings);
+      if(m.type==='alec_bridge_start')startAlecBridge(settings);
+      else {config.alecBridge=settings;saveConfig();panel();}
+      panelNote(m.type==='alec_bridge_start'?'A iniciar o Bridge V16.':'Configuração guardada.');
+    }catch(e){panelNote(String(e.message).slice(0,400),true);panel();}
+  } else if(m.type==='alec_bridge_stop'){
+    config.alecRemoteEnabled=false;saveConfig();alecBridge.stop();panel();
+  } else if (m.type === 'alec_remote_access'`);
+  rep(sc,"config.alecRemoteEnabled=m.enabled; saveConfig(); panel();","if(alecBridge.snapshot().phase==='running' && m.enabled && !alecBridge.settings()?.ask){panelNote('Ask desactivado no Bridge gerido. Pare e configure o serviço.',true);return;} config.alecRemoteEnabled=m.enabled; saveConfig(); panel();");
+  rep(sc,"alecReady = true;","alecReady = true;\nif(config.alecBridge?.auto){try{startAlecBridge(config.alecBridge);}catch(e){panelNote('Bridge não iniciado: '+String(e.message).slice(0,300),true);}}");
+  rep(sc,"}).on('close', () => {\n  // The app quit","}).on('close', () => {\n  alecBridge.stop();\n  // The app quit");
+  rep(pj,"function generalPage() {",`let alecBridgeDraft=null,alecBridgeDraftKey='';
+  function managedBridgeGroup(){
+    const b=state.alecManagedBridge;
+    if(!b)return null;
+    const initial=b.settings||{};
+    const key=JSON.stringify(initial);
+    if(!alecBridgeDraft||alecBridgeDraftKey!==key){
+      alecBridgeDraft={project:'',python:'',bind:b.interfaces?.find(a=>!a.startsWith('127.'))||'127.0.0.1',roots:[],transfer:'',ask:false,screen:false,camera:false,auto:false,visionServer:'',visionModel:'',ollamaModel:'',...initial};
+      alecBridgeDraftKey=key;
+    }
+    const d=alecBridgeDraft,locked=['running','starting','stopping'].includes(b.phase);
+    const row=(label,k,placeholder='')=>el('label',{className:'alec-bridge-field'},el('span',{textContent:label}),el('input',{type:'text',value:d[k]||'',placeholder,disabled:locked,'aria-label':label,'data-k':'bridge-'+k,on:{input:e=>{d[k]=e.target.value;}}}));
+    const check=(label,k)=>el('label',{className:'alec-bridge-check'},el('input',{type:'checkbox',checked:!!d[k],disabled:locked,on:{change:e=>{d[k]=e.target.checked;}}}),el('span',{textContent:label}));
+    const roots=el('div',{className:'group'},el('h3',{textContent:'Pastas de leitura (API de ficheiros)'}),
+      ...d.roots.map((v,i)=>el('div',{className:'alec-bridge-root'},el('input',{type:'text',value:v,disabled:locked,'aria-label':'Pasta '+(i+1),on:{input:e=>{d.roots[i]=e.target.value;}}}),btn('Remover',()=>{d.roots.splice(i,1);render('bridge-add-root');},{disabled:locked}))),
+      btn('Adicionar pasta',()=>{d.roots.push('');render('bridge-add-root');},{disabled:locked||d.roots.length>=32,k:'bridge-add-root'}));
+    const addresses=[...new Set([...(b.interfaces||[]),d.bind])].filter(Boolean);
+    const submit=type=>{document.activeElement?.blur();send({type,settings:{...d,roots:d.roots.filter(x=>x.trim())}});};
+    return group('Bridge V16 · Serviço gerido', 'Utiliza o projecto V16 local auditado. A sessão é renovada a cada arranque. Python 3.10+ necessário.',null,
+      el('p',{textContent:'Estado: '+({running:'Em execução',starting:'A iniciar',stopping:'A terminar',stopped:'Parado',error:'Erro'}[b.phase]||'Indisponível')}),
+      b.error?el('p',{textContent:b.error}):null,
+      b.phase==='running'?el('div',{className:'alec-pair'},el('p',{textContent:b.url}),el('strong',{textContent:b.code}),el('p',{textContent:'Código de emparelhamento actual · '+b.version})):null,
+      row('Pasta do projecto ALEC Remote V16','project','C:\\\\...\\\\ALEC_Remote_V16'),row('Executável Python / py.exe','python','C:\\\\Windows\\\\py.exe'),
+      el('label',{className:'alec-bridge-field'},el('span',{textContent:'Interface de rede privada'}),el('select',{disabled:locked,value:d.bind,on:{change:e=>{d.bind=e.target.value;}}},...addresses.map(value=>el('option',{value,selected:d.bind===value,textContent:value+(value.startsWith('127.')?' · Só PC':'')})))),
+      roots,row('Pasta de recepção (upload opcional)','transfer','Vazio = desactivado'),
+      check('Permitir Ask remoto com ferramentas gerais (não limitado pelas pastas acima)','ask'),
+      el('p',{textContent:'Os limites de pastas aplicam-se apenas à API de ficheiros. Ask remoto pode usar ferramentas gerais do agente; mantenha-o desligado para limitar o acesso directo.'}),
+      check('Permitir captura do ecrã','screen'),check('Permitir webcam','camera'),check('Iniciar Bridge automaticamente com ALEC','auto'),
+      row('Servidor de visão local (opcional)','visionServer','http://127.0.0.1:1234/v1'),row('Modelo de visão local','visionModel'),row('Modelo Ollama de visão','ollamaModel'),
+      el('div',{className:'row-btns'},btn('Guardar',()=>submit('alec_bridge_save'),{disabled:locked}),btn('Iniciar',()=>submit('alec_bridge_start'),{kind:'primary',disabled:locked}),btn('Parar / revogar sessões',()=>send({type:'alec_bridge_stop'}),{disabled:!['running','starting'].includes(b.phase)})),
+      el('p',{textContent:'Não cria regras de firewall nem encaminha portas. Use LAN de confiança ou Tailscale. Alterações às pastas exigem parar e reiniciar o Bridge.'}));
+  }
+  function generalPage() {`);
+  rep(pj,"const profile=state.alecPersona;\n    return [","const profile=state.alecPersona;\n    return [\n      managedBridgeGroup(),");
+  out["showcase/panel/alec-theme.css"]+="\n.alec-bridge-field{display:grid;gap:5px;margin:7px 0}.alec-bridge-field input,.alec-bridge-field select,.alec-bridge-root input{min-width:0;width:100%;padding:8px;border:1px solid var(--line-hi);background:var(--panel);color:var(--ink);border-radius:7px;font:12px var(--mono)}.alec-bridge-root{display:flex;gap:5px;align-items:center}.alec-bridge-check{display:flex;align-items:center;gap:7px;margin:6px 0}.alec-pair{background:var(--panel);border:1px solid var(--line);padding:12px;border-radius:9px;text-align:center}.alec-pair strong{font-size:26px;letter-spacing:.2em;color:var(--accent)}\n";
   return {out,changes};
 }
 const paths=["showcase/tauri/sidecar/sidekick.mjs","showcase/tauri/sidecar/speaker.mjs","showcase/tauri/sidecar/fish.mjs","showcase/tauri/sidecar/local.mjs","showcase/panel/index.html","showcase/panel/panel.js","showcase/panel/panel.css","showcase/roamies/12-sidekick.js","showcase/roamies/jarvis.js","showcase/desktop.html","showcase/tauri/src-tauri/tauri.conf.json","showcase/tauri/src-tauri/src/main.rs"];
@@ -205,7 +278,7 @@ const actual=execFileSync('git',['-C',root,'describe','--tags','--exact-match','
 if(actual!=='v0.1.51')throw Error('Only v0.1.51 is supported.');
 if(execFileSync('git',['-C',root,'status','--porcelain'],{encoding:'utf8'}).trim())throw Error('Use a clean disposable checkout.');
 const files=Object.fromEntries(paths.map(p=>[p,fs.readFileSync(path.join(root,p),'utf8').replace(/\r\n/g,'\n')]));
-const {out,changes}=prepareSources(files,{voice,name,bridge:legacy.slice(0,boundary)});
+const {out,changes}=prepareSources(files,{voice,name,bridge:legacy.slice(0,boundary),bridgeSupervisor:fs.readFileSync(new URL('./alec-bridge-supervisor.mjs',import.meta.url),'utf8')});
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'alec-check-'));
 try{
  for(const [p,s] of Object.entries(out)){
