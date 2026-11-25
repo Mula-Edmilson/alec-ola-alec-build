@@ -12,7 +12,7 @@ const allowed=new Set([
  'showcase/tauri/sidecar/test/snooze.test.mjs',
  'showcase/tauri/sidecar/fish.mjs','showcase/tauri/sidecar/local.mjs',
  'showcase/panel/index.html','showcase/panel/panel.js','showcase/panel/panel.css',
- 'showcase/roamies/12-sidekick.js','showcase/roamies/jarvis.js','showcase/desktop.html','showcase/onboarding/onboarding.js',
+ 'showcase/roamies/12-sidekick.js','showcase/roamies/jarvis.js','showcase/roamies/10-dither.js','showcase/desktop.html','showcase/onboarding/onboarding.js',
  'showcase/tauri/src-tauri/tauri.conf.json','showcase/tauri/src-tauri/src/main.rs',
  'showcase/tauri/src-tauri/voice-win/src/main.rs','showcase/tauri/src-tauri/voice-win/src/wake.rs'
 ]);
@@ -43,4 +43,9 @@ assert.ok(after('showcase/tauri/src-tauri/voice-win/src/main.rs').includes('Some
 // Only strengthen the one known assertion; the rest of the upstream test must remain byte-identical after newline normalization.
 assert.equal(after("showcase/tauri/sidecar/test/prompt.test.mjs"),before("showcase/tauri/sidecar/test/prompt.test.mjs").replace("assert.match(side, /const agentish = !intro && !news && wantsAgent\\(text\\);/, 'a news turn never hatches an agent');","assert.match(side, /const agentish = !alecConversationNow\\(\\) && !intro && !news && wantsAgent\\(text\\);/, 'neither a conversation-only model nor a news turn hatches an agent');"));
 assert.equal(after("showcase/tauri/sidecar/test/snooze.test.mjs"),before("showcase/tauri/sidecar/test/snooze.test.mjs").replace("const args = /running\\.then\\(\\(\\) => prompt\\(([^)]*)\\)\\)/.exec(side)[1].split(',').map((a) => a.trim());","const call = /running\\.then\\(\\(\\) => alecContext\\.run\\(remoteDevice, async \\(\\) => \\{ alecBegin\\(remoteId\\); try \\{ return await prompt\\(([^)]*)\\); \\} catch\\(e\\) \\{ if\\(remoteId\\) alecFailed=true; throw e; \\} finally \\{ alecFinish\\(remoteId\\); \\} \\}\\)\\)/.exec(side);\n  assert.ok(call, 'enqueue calls prompt inside the remote context and finalizes the receipt');\n  const args = call[1].split(',').map((a) => a.trim());"));
+const panelSource=after('showcase/panel/panel.js'),orbSource=after('showcase/roamies/jarvis.js'),desktopSource=after('showcase/roamies/10-dither.js');
+assert.ok(orbSource.includes("revision:'ALEC_ORB_NATIVE_V2'"),'Approved native particle renderer is required');
+assert.ok(panelSource.includes("id:'alec-main-orb'")&&panelSource.includes('alecDashboard(),')&&panelSource.includes("type:'alec_panel_ask'")&&panelSource.includes("type:'alec_panel_listen'"),'Dashboard must render orb and real input controls');
+assert.ok(desktopSource.includes('window.Roamie.alecOrb.paint(ctx'),'Floating desktop renderer must use smooth orb');
+assert.ok(source.includes("kind:'alec_live'")&&source.includes("m.type==='alec_panel_ask'")&&source.includes("m.type==='alec_panel_listen'"),'Native event routes are required');
 console.log('Parity source gate OK: '+protectedPaths.length+' original tracked paths protected; all native script references preserved. Runtime behavior still requires tests.');
