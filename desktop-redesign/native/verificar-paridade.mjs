@@ -12,7 +12,7 @@ const allowed=new Set([
  'showcase/tauri/sidecar/test/snooze.test.mjs',
  'showcase/tauri/sidecar/fish.mjs','showcase/tauri/sidecar/local.mjs',
  'showcase/panel/index.html','showcase/panel/panel.js','showcase/panel/panel.css',
- 'showcase/roamies/12-sidekick.js','showcase/roamies/jarvis.js','showcase/roamies/10-dither.js','showcase/desktop.html','showcase/onboarding/onboarding.js',
+ 'showcase/roamies/12-sidekick.js','showcase/roamies/jarvis.js','showcase/roamies/10-dither.js','showcase/roamies/ask-bar.js','showcase/desktop.html','showcase/onboarding/onboarding.js',
  'showcase/tauri/src-tauri/tauri.conf.json','showcase/tauri/src-tauri/src/main.rs',
  'showcase/tauri/src-tauri/src/voice.rs',
  'showcase/tauri/src-tauri/voice-win/src/main.rs','showcase/tauri/src-tauri/voice-win/src/wake.rs'
@@ -49,4 +49,9 @@ assert.ok(orbSource.includes("revision:'ALEC_ORB_NATIVE_V2'"),'Approved native p
 assert.ok(panelSource.includes("id:'alec-main-orb'")&&panelSource.includes('alecDashboard(),')&&panelSource.includes("type:'alec_panel_ask'")&&panelSource.includes("type:'alec_panel_listen'"),'Dashboard must render orb and real input controls');
 assert.ok(desktopSource.includes('window.Roamie.alecOrb.paint(ctx'),'Floating desktop renderer must use smooth orb');
 assert.ok(source.includes("kind:'alec_live'")&&source.includes("m.type==='alec_panel_ask'")&&source.includes("m.type==='alec_panel_listen'"),'Native event routes are required');
+assert.ok(panelSource.includes("const ALEC_TOP=['home','conversations','vision','memory','remote','abilities','settings','about']"),'Approved navigation required');
+assert.ok(panelSource.includes("placeholder:'Ask me anything…'")&&panelSource.includes("invoke('alec_panel_compact'")&&panelSource.includes("type:'alec_visual_report'"),'Native compact, Ask and visual verification required');
+assert.ok(!panelSource.includes('Digital Reach Out')&&!after('showcase/panel/index.html').includes('By Ken Kai'),'Remove commercial branding from visible dashboard');
+assert.ok(panelSource.includes('Créditos técnicos e licenças open source')&&panelSource.includes('https://github.com/KenKaiii/Roamies'),'Original source attribution retained');
+assert.ok(after('showcase/roamies/ask-bar.js').includes("submit.addEventListener('click'"),'Cursor ask send control missing');
 console.log('Parity source gate OK: '+protectedPaths.length+' original tracked paths protected; all native script references preserved. Runtime behavior still requires tests.');
