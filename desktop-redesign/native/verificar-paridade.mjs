@@ -12,6 +12,7 @@ const allowed=new Set([
  'showcase/tauri/sidecar/test/snooze.test.mjs',
  'showcase/tauri/sidecar/fish.mjs','showcase/tauri/sidecar/local.mjs',
  'showcase/panel/index.html','showcase/panel/panel.js','showcase/panel/panel.css',
+ "showcase/roamies/glass.js","showcase/roamies/agent.js","showcase/roamies/agent-cards.js","showcase/roamies/agent-panel.js","showcase/roamies/ink.js","showcase/roamies/sidebar.js","showcase/roamies/notch.js",
  'showcase/roamies/12-sidekick.js','showcase/roamies/jarvis.js','showcase/roamies/10-dither.js','showcase/roamies/ask-bar.js','showcase/roamies/core.js','showcase/roamies/host.js','showcase/desktop.html','showcase/onboarding/onboarding.js',
  'showcase/tauri/src-tauri/tauri.conf.json','showcase/tauri/src-tauri/src/main.rs',
  'showcase/tauri/src-tauri/src/voice.rs',
@@ -45,7 +46,7 @@ assert.ok(after('showcase/tauri/src-tauri/voice-win/src/main.rs').includes('Some
 assert.equal(after("showcase/tauri/sidecar/test/prompt.test.mjs"),before("showcase/tauri/sidecar/test/prompt.test.mjs").replace("assert.match(side, /const agentish = !intro && !news && wantsAgent\\(text\\);/, 'a news turn never hatches an agent');","assert.match(side, /const agentish = !alecConversationNow\\(\\) && !intro && !news && wantsAgent\\(text\\);/, 'neither a conversation-only model nor a news turn hatches an agent');"));
 assert.equal(after("showcase/tauri/sidecar/test/snooze.test.mjs"),before("showcase/tauri/sidecar/test/snooze.test.mjs").replace("const args = /running\\.then\\(\\(\\) => prompt\\(([^)]*)\\)\\)/.exec(side)[1].split(',').map((a) => a.trim());","const call = /running\\.then\\(\\(\\) => alecContext\\.run\\(remoteDevice, async \\(\\) => \\{ alecBegin\\(remoteId\\); try \\{ return await prompt\\(([^)]*)\\); \\} catch\\(e\\) \\{ if\\(remoteId\\) alecFailed=true; throw e; \\} finally \\{ alecFinish\\(remoteId\\); \\} \\}\\)\\)/.exec(side);\n  assert.ok(call, 'enqueue calls prompt inside the remote context and finalizes the receipt');\n  const args = call[1].split(',').map((a) => a.trim());"));
 const panelSource=after('showcase/panel/panel.js'),orbSource=after('showcase/roamies/jarvis.js'),desktopSource=after('showcase/roamies/10-dither.js');
-assert.ok(orbSource.includes("revision:'ALEC_ORB_NATIVE_V2'"),'Approved native particle renderer is required');
+assert.ok(orbSource.includes("revision:'ALEC_ORB_NATIVE_V5'"),'Approved native particle renderer is required');
 assert.ok(panelSource.includes("id:'alec-main-orb'")&&panelSource.includes('return [alecDashboard()];')&&panelSource.includes("id:'alec-ask-launch'")&&panelSource.includes("act('ask',true)")&&panelSource.includes("type:'alec_panel_listen'"),'Dashboard must render orb and real native Ask launcher and voice controls');
 assert.ok(desktopSource.includes('window.Roamie.alecOrb.paint(ctx'),'Floating desktop renderer must use smooth orb');
 assert.ok(source.includes("kind:'alec_live'")&&source.includes("m.type==='alec_panel_ask'")&&source.includes("m.type==='alec_panel_listen'"),'Native event routes are required');
@@ -62,4 +63,11 @@ assert.ok(panelSource.includes('Créditos técnicos e licenças open source')&&p
 assert.ok(after('showcase/roamies/ask-bar.js').includes("submit.addEventListener('click'"),'Cursor ask send control missing');
 assert.ok(after('showcase/roamies/core.js').includes("R.alecOrbOpen(true)")&&after('showcase/roamies/host.js').includes("invoke('alec_orb_open'"),'Floating orb must open native compact dashboard');
 assert.ok(after('showcase/roamies/ask-bar.js').includes("type:'alec_panel_listen'"),'Floating Ask microphone must use real voice route');
+assert.ok(desktopSource.includes('ALEC_NATIVE_SINGLE_BODY')&&!desktopSource.includes('}else J.body(k, bx / P, by / P, R / P, jst);'),'Legacy orb fallback must be absent');
+assert.ok(orbSource.includes('ALEC_GAS_V5')&&orbSource.includes('pulse*.10'),'Shared audio-reactive gas is required');
+assert.ok(after('showcase/roamies/notch.js').includes('R.alecOrb.paint(gctx'),'Notch uses the same ALEC orb');
+assert.ok(panelSource.includes('alec-official-logo')&&!panelSource.includes('https://github.com/Mula-Edmilson'),'Official logo and no personal/product GitHub links in About');
+assert.ok(shell.includes('voice_owner.as_deref()==Some(label.as_str())'),'Only one overlay receives speech');
+assert.ok(after(core+'speaker.mjs').includes('generation!==tries'),'Ignore stale speech-provider callbacks');
+for(const f of ['glass.js','agent.js','agent-cards.js','agent-panel.js','ink.js','sidebar.js','notch.js','ask-bar.js'])assert.ok(!/#78ffe2\b|rgba?\(\s*120\s*,\s*255\s*,\s*226\b/i.test(after('showcase/roamies/'+f)),'Legacy brand accent in '+f);
 console.log('Parity source gate OK: '+protectedPaths.length+' original tracked paths protected; all native script references preserved. Runtime behavior still requires tests.');
