@@ -26,7 +26,7 @@ for(const line of git('diff','--name-status','HEAD').trim().split('\n').filter(B
  assert.equal(status,'M','No native source deletion, rename or replacement allowed: '+line);
  assert.ok(allowed.has(file),'Unexpected modification: '+file);
 }
-const newAllowed=new Set(['showcase/tauri/sidecar/alec-local-context.mjs','showcase/tauri/sidecar/alec-voice-preference.mjs','showcase/panel/alec-theme.css','showcase/tauri/sidecar/alec-bridge-supervisor.mjs','showcase/tauri/sidecar/alec-skill-hub.mjs','showcase/tauri/sidecar/alec-legacy-profile.mjs','showcase/tauri/sidecar/alec-wake-phrase.mjs','showcase/tauri/sidecar/test/alec-wake-phrase.test.mjs']);
+const newAllowed=new Set(['showcase/tauri/sidecar/alec-qr-runtime.mjs','showcase/tauri/sidecar/alec-qrcode.cjs','showcase/tauri/sidecar/alec-local-context.mjs','showcase/tauri/sidecar/alec-voice-preference.mjs','showcase/panel/alec-theme.css','showcase/tauri/sidecar/alec-bridge-supervisor.mjs','showcase/tauri/sidecar/alec-skill-hub.mjs','showcase/tauri/sidecar/alec-legacy-profile.mjs','showcase/tauri/sidecar/alec-wake-phrase.mjs','showcase/tauri/sidecar/test/alec-wake-phrase.test.mjs']);
 for(const f of git('ls-files','--others','--exclude-standard').trim().split('\n').filter(Boolean))assert.ok(newAllowed.has(f),'Unexpected added source: '+f);
 const before=f=>git('show','HEAD:'+f).replace(/\r\n/g,'\n');
 const after=f=>readFileSync(path.join(root,f),'utf8').replace(/\r\n/g,'\n');
@@ -86,4 +86,7 @@ assert.ok(source.includes('alecVoicePreference.get()')&&source.includes("alec_fi
 assert.ok(panelSource.includes('Voz personalizada · Fish Audio')&&panelSource.includes("alec_fish_reference_save"),'Editable Fish Audio reference field');
 assert.ok(source.includes("['ultren', 'Amilcar',")&&!source.includes('your name is Ultren'),'Rename character without changing internal key');
 assert.equal(after("showcase/tauri/sidecar/test/fish.test.mjs"),before("showcase/tauri/sidecar/test/fish.test.mjs").replace("assert.deepEqual(FISH_CHOICES.map((c) => c.id), ['drama-3', 's2.1-pro']);","assert.deepEqual(FISH_CHOICES.map((c) => c.id), ['s2.1-pro-free', 'drama-3', 's2.1-pro']);").replace("for (const c of FISH_CHOICES) { assert.ok(FISH_MODELS.includes(c.id) && c.id !== FREE_MODEL, c.id); assert.ok(c.perM > 0 && c.name, c.id); }","for (const c of FISH_CHOICES) { assert.ok(FISH_MODELS.includes(c.id) && c.name, c.id); assert.ok(c.id === FREE_MODEL ? c.perM === 0 : c.perM > 0, c.id); }\n  assert.equal(FISH_CHOICES[0].id, FREE_MODEL, 'ALEC defaults to the free model; paid models remain opt-in');").replace("Date.parse(FISH_CHOICES[0].promo.until)","Date.parse(FISH_CHOICES.find(c=>c.id==='drama-3').promo.until)"));
+assert.ok(source.includes('alec_bridge_qr_renew')&&panelSource.includes('alecPairingCard')&&panelSource.includes('Código QR temporário'),'Native QR pairing controls');
+assert.ok(after(core+'alec-qr-runtime.mjs').includes("'/api/pair/qr'")&&after(core+'alec-qr-runtime.mjs').includes('self.until=self.clock()+120')&&after(core+'alec-qr-runtime.mjs').includes('hmac.compare_digest'),'One-use private pairing endpoint');
+assert.ok(after(core+'alec-qrcode.cjs').includes('MIT License'),'QR dependency license retained');
 console.log('Parity source gate OK: '+protectedPaths.length+' original tracked paths protected; all native script references preserved. Runtime behavior still requires tests.');
