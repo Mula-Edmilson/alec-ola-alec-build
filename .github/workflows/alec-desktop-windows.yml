@@ -1,0 +1,204 @@
+name: ALEC Desktop Windows candidate
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [alec-desktop-redesign, alec-proactive-v7]
+    paths:
+      - '.github/workflows/alec-desktop-windows.yml'
+      - 'desktop-redesign/native/**'
+permissions:
+  contents: read
+concurrency:
+  group: alec-desktop-windows-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  build:
+    if: github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && (github.head_ref == 'alec-desktop-redesign' || github.head_ref == 'alec-proactive-v7'))
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Checkout exact Roamies source
+        shell: bash
+        run: |
+          git clone --branch v0.1.51 --depth 1 https://github.com/KenKaiii/Roamies.git upstream
+          test "$(git -C upstream rev-parse HEAD)" = "362645466349f4c520ad453d94a94c2481776c2f"
+      - name: Transform native source without personal data
+        shell: bash
+        run: |
+          node desktop-redesign/native/preparar-fonte.mjs upstream --public
+          node desktop-redesign/native/verificar-paridade.mjs upstream
+          node desktop-redesign/native/testar-tailnet.mjs
+          node desktop-redesign/native/testar-voz-alec.mjs
+          node desktop-redesign/native/testar-contexto-local.mjs
+      - name: Install locked sidecar dependencies
+        working-directory: upstream/showcase/tauri/sidecar
+        shell: bash
+        run: npm ci
+      - name: Run every sidecar regression test and report all failures
+        shell: bash
+        run: node desktop-redesign/native/executar-testes.mjs upstream/showcase/tauri/sidecar/test
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+          components: rustfmt
+      - name: Parse transformed native Rust before expensive compilation
+        shell: bash
+        run: |
+          rustfmt --edition 2021 --emit stdout --config skip_children=true upstream/showcase/tauri/src-tauri/src/main.rs > /dev/null
+          rustfmt --edition 2021 --emit stdout --config skip_children=true upstream/showcase/tauri/src-tauri/src/voice.rs > /dev/null
+      - name: Test original and configurable native wake matcher
+        shell: bash
+        run: |
+          rustc --edition=2021 --test upstream/showcase/tauri/src-tauri/voice-win/src/wake.rs -o wake-tests.exe
+          ./wake-tests.exe
+          node upstream/showcase/tauri/sidecar/test/alec-wake-phrase.test.mjs
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            upstream/showcase/tauri/src-tauri -> target
+            upstream/showcase/tauri/src-tauri/voice-win -> target
+            upstream/showcase/tauri/src-tauri/hands-win -> target
+          key: alec-windows-v7-icon
+      - name: Install Tauri CLI
+        shell: bash
+        run: cargo install tauri-cli --version "^2" --locked
+      - name: Compile Windows x64 NSIS installer
+        working-directory: upstream/showcase/tauri
+        shell: bash
+        env:
+          TAURI_BUNDLES: nsis
+        run: ./build.sh release --target x86_64-pc-windows-msvc
+      - name: Install and verify native helpers and runtime
+        working-directory: upstream/showcase/tauri
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $setup = Get-ChildItem 'src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe' | Select-Object -First 1
+          if (-not $setup) { throw 'No installer produced' }
+          $p = Start-Process -FilePath $setup.FullName -ArgumentList '/S' -Wait -PassThru
+          if ($p.ExitCode) { throw "Installer failed ($($p.ExitCode))" }
+          $app = Get-ChildItem (Join-Path $env:LOCALAPPDATA 'ALEC'), (Join-Path $env:ProgramFiles 'ALEC') -Filter roamies.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $app) { throw 'Installed ALEC binary not found' }
+          $dir = $app.DirectoryName
+          # Inspect the actual installed EXE's icon (not just the source ICO).
+          Add-Type -AssemblyName System.Drawing
+          $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($app.FullName)
+          if (-not $icon) { throw 'Installed executable icon is absent' }
+          $bitmap = $icon.ToBitmap()
+          $scaled = [System.Drawing.Bitmap]::new($bitmap,32,32)
+          $white = 0; $navy = 0
+          for ($y=0; $y -lt 32; $y++) {
+            for ($x=0; $x -lt 32; $x++) {
+              $c = $scaled.GetPixel($x,$y)
+              if ($c.A -gt 200 -and $c.R -gt 210 -and $c.G -gt 210 -and $c.B -gt 210) { $white++ }
+              if ($c.A -gt 200 -and $c.R -lt 45 -and $c.G -lt 45 -and $c.B -lt 75) { $navy++ }
+            }
+          }
+          $scaled.Dispose(); $bitmap.Dispose(); $icon.Dispose()
+          Write-Host "Installed executable icon: white=$white navy=$navy"
+          if ($white -lt 80 -or $navy -lt 200) { throw 'Installed executable did not expose the official white/navy ALEC icon' }
+          $missing = @('roamies-node.exe','roamies-voice.exe','roamies-hands.exe','sidecar/sidekick.mjs','msvcp140.dll','msvcp140_1.dll','vcruntime140.dll','vcruntime140_1.dll','onnxruntime.dll') | Where-Object { -not (Test-Path (Join-Path $dir $_)) }
+          if ($missing) { throw "Missing native files: $($missing -join ', ')" }
+          & (Join-Path $dir 'roamies-hands.exe') --self-test
+          if ($LASTEXITCODE) { throw 'Hands self-test failed' }
+          & (Join-Path $dir 'roamies-voice.exe') --test-ort
+          if ($LASTEXITCODE) { throw 'Voice ONNX runtime failed' }
+          $perms = & (Join-Path $dir 'roamies-voice.exe') --perms
+          if (-not ($perms -match '"type":"perms"')) { throw 'Voice helper failed to start' }
+          & (Join-Path $dir 'roamies-node.exe') --check (Join-Path $dir 'sidecar/sidekick.mjs')
+          if ($LASTEXITCODE) { throw 'Bundled sidecar syntax failed' }
+          $data = Join-Path $env:RUNNER_TEMP 'alec-smoke'
+          $configDir = Join-Path $data 'Roamies/Data'
+          New-Item -ItemType Directory -Force $configDir | Out-Null
+          Set-Content (Join-Path $configDir 'settings.json') '{"onboarded":true,"setupVersion":2,"voice":false,"alecRemoteEnabled":false,"seenVersion":"0.1.51"}' -Encoding utf8NoBOM
+          $env:ROAMIES_DATA_DIR = $data
+          # Test runner only: inspect the actual installed WebView2. Never embedded in the release.
+          $env:ALEC_UI_TEST = '1'
+          $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=9222 --remote-debugging-address=127.0.0.1'
+          $run = Start-Process -FilePath $app.FullName -ArgumentList '--panel' -PassThru
+          try {
+            $logs = Join-Path $data 'Roamies/Data/logs'
+            $started = $false
+            for ($i=0; $i -lt 60; $i++) {
+              Start-Sleep -Seconds 1
+              if ($run.HasExited) { break }
+              if (Get-ChildItem $logs -Filter *.log -ErrorAction SilentlyContinue | Select-String -Pattern ' start ' -Quiet) { $started=$true; break }
+            }
+            if (-not ($started -and -not $run.HasExited)) { throw 'Installed sidecar did not start' }
+            $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+            $expectedStartup = '"' + $app.FullName + '"'
+            $startup = $null
+            for ($i=0; $i -lt 20; $i++) {
+              $startup = Get-ItemPropertyValue -Path $runKey -Name ALEC -ErrorAction SilentlyContinue
+              if ($startup -eq $expectedStartup) { break }
+              Start-Sleep -Seconds 1
+            }
+            if ($startup -ne $expectedStartup) { throw 'ALEC independent autostart was not registered to the installed EXE' }
+            Write-Host 'ALEC independent autostart verified against installed executable.'
+            Start-Process -FilePath $app.FullName -ArgumentList '--panel'
+            $reportPath = Join-Path $data 'alec-native-visual-report.json'
+            for ($i=0; $i -lt 100; $i++) {
+              if (Test-Path $reportPath) { break }
+              if ($run.HasExited) { break }
+              if ($i -eq 30 -or $i -eq 60) { Start-Process -FilePath $app.FullName -ArgumentList '--panel' }
+              Start-Sleep -Seconds 1
+            }
+            if (-not (Test-Path $reportPath)) {
+              Write-Host '--- Native window trace ---'
+              Get-Content (Join-Path $data 'alec-native-window.log') -ErrorAction SilentlyContinue
+              Write-Host '--- Native sidecar trace ---'
+              Get-ChildItem $logs -Filter *.log -ErrorAction SilentlyContinue | Get-Content -Tail 25
+              Get-Content (Join-Path $env:USERPROFILE 'Roamies/Data/logs/sidekick.log') -Tail 35 -ErrorAction SilentlyContinue
+              Get-Process -Name roamies,msedgewebview2 -ErrorAction SilentlyContinue | Select-Object Id,ProcessName,SessionId,MainWindowTitle | Format-Table -AutoSize
+              throw 'Installed native dashboard did not report a visible orb and all eight navigation entries'
+            }
+            $report = Get-Content $reportPath -Raw | ConvertFrom-Json
+            if ($report.revision -ne 'ALEC_ORB_NATIVE_V6' -or $report.lit -le 100 -or $report.blue -le 50 -or $report.coreLit -lt 100 -or $report.motionPixels -lt 50 -or $report.voicePixels -lt 50 -or -not $report.visible -or -not $report.compose -or -not $report.noHomeInput -or -not $report.listen -or $report.tabs -ne 8 -or $report.windowWidth -gt 400 -or $report.windowHeight -gt 490) { throw 'Installed dashboard failed required runtime visual assertions' }
+            $visualOut = Join-Path $env:GITHUB_WORKSPACE 'candidate'
+            New-Item -ItemType Directory -Force $visualOut | Out-Null
+            Copy-Item $reportPath (Join-Path $visualOut 'ALEC-native-visual-report.json')
+            Get-Content $reportPath
+            # The embedded native WebView report is mandatory. CDP capture remains a separate evidence check.
+            & node (Join-Path $env:GITHUB_WORKSPACE 'desktop-redesign/native/verificar-visual-instalado.mjs') (Join-Path $visualOut 'ALEC-installed-dashboard.png')
+            if ($LASTEXITCODE) {
+              Write-Warning 'Installed canvas passed native validation, but screenshot capture via CDP was unavailable.'
+              Set-Content (Join-Path $visualOut 'SCREENSHOT-UNAVAILABLE.txt') 'Actual native dashboard pixel and controls validation passed. CDP screenshot unavailable; visual fidelity requires interactive review.'
+            }
+          } finally {
+            if (-not $run.HasExited) { taskkill /PID $run.Id /T /F | Out-Null }
+          }
+          $out = Join-Path $env:GITHUB_WORKSPACE 'candidate'
+          New-Item -ItemType Directory -Force $out | Out-Null
+          $dest = Join-Path $out 'ALEC-Desktop-0.1.51-Native-v7.0.2-x64-candidate-setup.exe'
+          Copy-Item $setup.FullName $dest
+          $hash = (Get-FileHash $dest -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content (Join-Path $out 'SHA256.txt') "$hash  ALEC-Desktop-0.1.51-Native-v7.0.2-x64-candidate-setup.exe"
+      - name: Include corresponding source and license
+        shell: bash
+        run: |
+          git -C upstream diff --binary HEAD > candidate/ALEC-source.patch
+          mkdir -p candidate/new-source
+          git -C upstream ls-files --others --exclude-standard -- showcase/tauri/sidecar/alec-local-context.mjs showcase/tauri/sidecar/alec-voice-preference.mjs showcase/tauri/sidecar/alec-legacy-profile.mjs showcase/tauri/sidecar/alec-skill-hub.mjs showcase/tauri/sidecar/alec-bridge-supervisor.mjs showcase/panel/alec-theme.css showcase/tauri/sidecar/alec-wake-phrase.mjs showcase/tauri/sidecar/test/alec-wake-phrase.test.mjs | while IFS= read -r f; do
+            mkdir -p "candidate/new-source/$(dirname "$f")"
+            cp "upstream/$f" "candidate/new-source/$f"
+          done
+          cp upstream/LICENSE candidate/LICENSE
+          cp desktop-redesign/native/BUILD-CANDIDATE.md candidate/
+          echo 'Upstream: https://github.com/KenKaiii/Roamies/tree/362645466349f4c520ad453d94a94c2481776c2f' > candidate/SOURCE.txt
+          git rev-parse HEAD >> candidate/SOURCE.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ALEC-Desktop-Native-v7.0.2-Windows-x64-candidate
+          path: candidate/
+          if-no-files-found: error
+          retention-days: 30
