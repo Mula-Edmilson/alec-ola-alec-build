@@ -32,7 +32,7 @@ function call(method,params={}){
   pending.set(id,{resolve,reject,timer});ws.send(JSON.stringify({id,method,params}));
  });
 }
-const expression="(function inspectDashboard(){\n const c=document.getElementById('alec-main-orb'),status=document.getElementById('alec-orb-status');\n if(!c||!status||!window.__TAURI__?.core?.invoke)return {ready:false,title:document.title};\n const r=c.getBoundingClientRect(),ctx=c.getContext('2d');\n if(r.width<160||r.height<160||!ctx)return {ready:false,width:r.width,height:r.height};\n const data=ctx.getImageData(0,0,c.width,c.height).data;let lit=0,blue=0;\n for(let i=0;i<data.length;i+=4){if(data[i+3]>100)lit++;if(data[i+3]>100&&data[i+2]>data[i]+15)blue++;}\n return {ready:true,title:document.title,revision:window.Roamie?.alecOrb?.revision,width:r.width,height:r.height,lit,blue,status:status.textContent,compose:!!document.querySelector('.alec-compose input'),listen:!!document.getElementById('alec-orb-listen'),tabs:document.querySelectorAll('.nav [data-page]').length,visible:getComputedStyle(document.getElementById('frame')).opacity};\n})()";
+const expression="(function inspectDashboard(){\n const c=document.getElementById('alec-main-orb'),status=document.getElementById('alec-orb-status');\n if(!c||!status||!window.__TAURI__?.core?.invoke)return {ready:false,title:document.title};\n const r=c.getBoundingClientRect(),ctx=c.getContext('2d');\n if(r.width<130||r.height<130||!ctx)return {ready:false,width:r.width,height:r.height};\n const data=ctx.getImageData(0,0,c.width,c.height).data;let lit=0,blue=0;\n for(let i=0;i<data.length;i+=4){if(data[i+3]>100)lit++;if(data[i+3]>100&&data[i+2]>data[i]+15)blue++;}\n return {ready:true,title:document.title,revision:window.Roamie?.alecOrb?.revision,width:r.width,height:r.height,lit,blue,status:status.textContent,compose:!!document.getElementById('alec-ask-launch'),noHomeInput:!document.querySelector('#pane-home input[type=text],#pane-home textarea,.alec-compose'),listen:!!document.getElementById('alec-orb-listen'),tabs:[...document.querySelectorAll('.nav [data-page]')].filter(b=>b.getBoundingClientRect().width>0).length,windowWidth:innerWidth,windowHeight:innerHeight,visible:getComputedStyle(document.getElementById('frame')).opacity};\n})()";
 
 try{
  await call('Runtime.enable');await call('Page.enable');
@@ -46,7 +46,7 @@ try{
  console.log(JSON.stringify(report,null,2));
  assert.ok(report?.ready&&report.revision==='ALEC_ORB_NATIVE_V2','Wrong or absent native renderer');
  assert.ok(report.lit>100&&report.blue>50&&report.visible==='1','Installed orb did not render visibly');
- assert.ok(report.compose&&report.listen&&report.tabs>=11,'Dashboard controls or tabs missing');
+ assert.ok(report.compose&&report.noHomeInput&&report.listen&&report.tabs===8&&report.windowWidth<=400&&report.windowHeight<=490,'Dashboard controls or tabs missing');
  const screenshot=await call('Page.captureScreenshot',{format:'png',fromSurface:true});
  const png=Buffer.from(screenshot.data,'base64');
  assert.ok(png.length>8000&&png.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])),'Actual screenshot unavailable');
