@@ -466,7 +466,7 @@ function panel() {`);
     v=v.replace(/(rgba?\()\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?=\s*[,\)])/g,(m,start,a,b,c)=>alecBrandRgb[a+','+b+','+c]?start+alecBrandRgb[a+','+b+','+c]:m);
     if(v!==out[f]){out[f]=v;changes.push(f);}
   }
-  rep(dj,"pal: [[4, 16, 18], [14, 92, 96], [40, 196, 184], [120, 255, 226], [230, 255, 250]],","pal: [[5, 10, 18], [48, 76, 131], [100, 142, 240], [166, 186, 255], [234, 242, 255]],");
+  rep(dj,"pal: [[7,10,18], [36,45,91], [96,110,205], [166,186,255], [234,242,255]],","pal: [[5, 10, 18], [48, 76, 131], [100, 142, 240], [166, 186, 255], [234, 242, 255]],");
   return {out,changes};
 }
 const paths=["showcase/tauri/sidecar/sidekick.mjs","showcase/tauri/sidecar/speaker.mjs","showcase/tauri/sidecar/fish.mjs","showcase/tauri/sidecar/local.mjs","showcase/panel/index.html","showcase/panel/panel.js","showcase/panel/panel.css","showcase/roamies/12-sidekick.js","showcase/roamies/jarvis.js","showcase/desktop.html","showcase/tauri/src-tauri/tauri.conf.json","showcase/tauri/src-tauri/src/main.rs","showcase/tauri/src-tauri/voice-win/src/wake.rs","showcase/tauri/src-tauri/voice-win/src/main.rs","showcase/onboarding/onboarding.js","showcase/tauri/sidecar/test/prompt.test.mjs","showcase/tauri/sidecar/test/snooze.test.mjs","showcase/roamies/10-dither.js","showcase/tauri/src-tauri/src/voice.rs","showcase/roamies/ask-bar.js","showcase/roamies/core.js","showcase/roamies/host.js","showcase/roamies/glass.js","showcase/roamies/agent.js","showcase/roamies/agent-cards.js","showcase/roamies/agent-panel.js","showcase/roamies/ink.js","showcase/roamies/sidebar.js","showcase/roamies/notch.js"];
