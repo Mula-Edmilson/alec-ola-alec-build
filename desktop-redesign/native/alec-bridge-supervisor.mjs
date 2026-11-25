@@ -6,6 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 import {spawn,execFile} from 'node:child_process';
 import {promisify} from 'node:util';
+import {makePairMatrix,buildPairRunner} from './alec-qr-runtime.mjs';
 const execFileAsync=promisify(execFile);
 export const RUNNER="import ipaddress,json,os,sys,threading\nfrom pathlib import Path\nif sys.version_info < (3,10): raise RuntimeError(\"Python 3.10 required\")\nsys.path.insert(0,sys.argv[1])\nimport server\nbind=os.environ['ALEC_MANAGED_BIND']\naddr=ipaddress.IPv4Address(bind)\nif not any(addr in ipaddress.ip_network(n) for n in ('127.0.0.0/8','10.0.0.0/8','172.16.0.0/12','192.168.0.0/16','100.64.0.0/10')): raise ValueError('Private IPv4 required')\nexpected=json.loads(os.environ['ALEC_FILE_ROOTS'])\nactual={str(p) for p in server.FILES.roots}\nif len(actual)!=len(expected) or actual!={str(Path(p).resolve(strict=True)) for p in expected}: raise ValueError('Read folder rejected')\nif os.environ.get('ALEC_TRANSFER_ROOT') and not server.TRANSFERS.info()['enabled']: raise ValueError('Transfer folder rejected')\nwith server.ThreadingHTTPServer((bind,server.PORT),server.Handler) as srv:\n    srv.daemon_threads=True\n    print('ALEC_MANAGED_READY '+json.dumps({'url':f'http://{bind}:{srv.server_address[1]}','code':server.PAIR_CODE,'version':server.VERSION,'roots':list(actual),'transfer':server.TRANSFERS.info()['enabled'],'ask':server.MIRROR_ENABLED}),flush=True)\n    def watch():\n        try: sys.stdin.buffer.read()\n        finally: srv.shutdown()\n    threading.Thread(target=watch,daemon=True).start()\n    srv.serve_forever(poll_interval=0.2)\n";
 const HASHES={"bubble_routing.py":"4a649c2ee210d24b865f022f2b4f7f2790b77f1e474737c959cd2272c1864ae3","feedback.py":"e54a18b1f99dfe3df0dd15352d5c582dd8b5263e294fd056380d87a91c5d70c6","files_pc.py":"a28e0f9a842fd5f6f52922f29ef93cbe2d08a61a51f08e37417da41737837932","jobs.py":"912b66ab96d27a903715c3eea6c997893256036cb7710c7baeb7974cf62e9915","listen.py":"bde74f6bcb5be2bc565035f836e81d588c5e3cfea1947a396ecdaea57652d195","live.py":"733e1f2cdcd59cc2b96f5d04cdc69225bc2862b6f14f28728fa76e91a2a86a8c","mirror.py":"b017d79241355fc17c4e7363006f03d51b88611452b5da293679632c751899bd","networking.py":"79a4843ef62ccb85d7f14db20be2cc06572e0cfcb02417b7b1e5faf93281fb5c","notifications.py":"7ddedf34044d81c27746e50ebabe42d353a26c954a9b3ec8000c46d34b1790ea","pcstatus.py":"efddd497cd9aff6bcdba184481f39a96e3e25d83af056068c4b6550c621e2f9a","resources.py":"313684f98b2ab93df883815a8946e99625babd9dc2a03b31cee8acc0856d224c","server.py":"87ad25336458904100bc1b4090a14db60ead49d3bd28f39916f6fb9625b0ea8e","store.py":"e410433dcf1ae852166b4f201b10e525633c9d7a15e081086c773ac1949cd448","transfer.py":"7fda7654f4c2a6d507eb3e600283ec5ff828500a7bb07199f22488391a1a320c","vision.py":"9ab731393d59365819591ab430938d3aa8417e48f587002efacb14bbdc0b7271","voice.py":"ec18a45fc729db8b507b71987ba37ce730b582b744df579d683a5f89be6a29f9","wake.py":"91959debeea7cbf17f5b4d68b54ff1c5b9dc5d1c2076c6f4e793d5efd3eabff9"};
@@ -104,11 +105,12 @@ export function cleanBridgeSettings(input){
   return {project,python,bind:input.bind,tailnet:input.tailnet===true,roots,transfer,ask:input.ask===true,screen:input.screen===true,camera:input.camera===true,auto:input.auto===true,visionServer:model(input.visionServer),visionModel:model(input.visionModel),ollamaModel:model(input.ollamaModel)};
 }
 export function createBridgeSupervisor({changed=()=>{},ready=()=>{},closed=()=>{}}={}){
-  let child=null,timer=null,info={phase:'stopped'},started=null;
+  let child=null,timer=null,qrTimer=null,info={phase:'stopped'},started=null;
   const emit=(next)=>{info=next;changed();};
+  function renewPairing(){if(child&&info.phase==='running'&&started?.tailnet)child.stdin.write('rotate\n');}
   function stop(){
     if(!child)return;
-    clearTimeout(timer); const c=child;
+    clearTimeout(timer);clearTimeout(qrTimer); const c=child;
     emit({phase:'stopping'});
     c.stdin.end();
     timer=setTimeout(()=>{if(child===c)c.kill();},3500);timer.unref();
@@ -123,7 +125,7 @@ export function createBridgeSupervisor({changed=()=>{},ready=()=>{},closed=()=>{
     const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'alec-v16-'));
     let dir;
     try{dir=path.join(copyAuditedBridge(settings.project,path.join(scratch,'source')),'bridge');}catch(e){fs.rmSync(scratch,{recursive:true,force:true});throw e;}
-    const args=[...(/^py\.exe$/i.test(path.basename(settings.python))?['-3']:[]),'-I','-B','-u','-c',RUNNER,dir];
+    const args=[...(/^py\.exe$/i.test(path.basename(settings.python))?['-3']:[]),'-I','-B','-u','-c',settings.tailnet?buildPairRunner(RUNNER):RUNNER,dir];
     let c;
     try{c=spawn(settings.python,args,{env,cwd:os.homedir(),windowsHide:true,shell:false,stdio:['pipe','pipe','pipe']});}catch(e){fs.rmSync(scratch,{recursive:true,force:true});throw e;}
     child=c;started=settings;emit({phase:'starting'});
@@ -132,12 +134,28 @@ export function createBridgeSupervisor({changed=()=>{},ready=()=>{},closed=()=>{
     c.stderr.resume(); // avoid recording tokens, instructions or paths
     c.stdout.setEncoding('utf8');
     c.stdout.on('data',chunk=>{
-      if(child!==c||info.phase!=='starting')return;
+      if(child!==c||!['starting','running'].includes(info.phase))return;
       buf+=chunk;
       if(buf.length>131072){failure='Resposta inicial demasiado grande.';c.kill();return;}
       for(let i;(i=buf.indexOf('\n'))>=0;){
         const line=buf.slice(0,i).trim();buf=buf.slice(i+1);
-        if(!line.startsWith('ALEC_MANAGED_READY '))continue;
+        if(info.phase==='running'&&settings.tailnet){
+          if(line.startsWith('ALEC_MANAGED_PAIR ')){
+            try{
+              const v=JSON.parse(line.slice('ALEC_MANAGED_PAIR '.length));
+              if(!Number.isSafeInteger(v.serial)||v.serial<1||v.ttl!==120)throw Error();
+              const matrix=makePairMatrix(settings.bind,v.ticket),serial=v.serial;
+              clearTimeout(qrTimer);emit({...info,qr:{matrix,serial,expiresAt:Date.now()+120000},paired:false});
+              qrTimer=setTimeout(()=>{if(child===c&&info.qr?.serial===serial)emit({...info,qr:null});},120000);qrTimer.unref();
+            }catch{clearTimeout(qrTimer);emit({...info,qr:null});}
+            continue;
+          }
+          if(line.startsWith('ALEC_MANAGED_PAIR_USED ')){
+            try{const v=JSON.parse(line.slice('ALEC_MANAGED_PAIR_USED '.length));if(info.qr?.serial===v.serial){clearTimeout(qrTimer);emit({...info,qr:null,paired:true});}}catch{}
+            continue;
+          }
+        }
+        if(info.phase!=='starting'||!line.startsWith('ALEC_MANAGED_READY '))continue;
         try{
           const v=JSON.parse(line.slice('ALEC_MANAGED_READY '.length));
           if(v.url!=='http://'+settings.bind+':8765'||!/^\d{6}$/.test(v.code)||v.version!=='16.0.0'||v.ask!==settings.ask||v.transfer!==!!settings.transfer||!Array.isArray(v.roots)||v.roots.length!==settings.roots.length)throw Error();
@@ -149,11 +167,11 @@ export function createBridgeSupervisor({changed=()=>{},ready=()=>{},closed=()=>{
     c.once('error',()=>{failure='Não foi possível iniciar Python.';});
     c.once('close',code=>{
       if(child!==c)return;
-      clearTimeout(timer);child=null;started=null;try{fs.rmSync(scratch,{recursive:true,force:true});}catch{}closed();
+      clearTimeout(timer);clearTimeout(qrTimer);child=null;started=null;try{fs.rmSync(scratch,{recursive:true,force:true});}catch{}closed();
       emit(failure?{phase:'error',error:failure}:info.phase==='stopping'?{phase:'stopped'}:{phase:'error',error:'Bridge terminou ('+String(code)+'). Verifique a porta 8765, Python e pastas.'});
     });
     timer=setTimeout(()=>{if(child===c&&info.phase==='starting'){failure='Tempo limite no arranque. Confirme Python e porta 8765.';c.kill();}},20000);timer.unref();
     return settings;
   }
-  return {start,stop,snapshot:()=>({...info,interfaces:interfaces(),defaults:{project:bundledProject(),python:pythonDefault()}}),settings:()=>started};
+  return {start,stop,renewPairing,snapshot:()=>({...info,interfaces:interfaces(),defaults:{project:bundledProject(),python:pythonDefault()}}),settings:()=>started};
 }
