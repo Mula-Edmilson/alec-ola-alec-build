@@ -48,7 +48,7 @@ export function aboutAlec({name='ALEC',looks=[],voice=true,wake=true,snap=true}=
  'Definições > Activação e escuta: microfone, reconhecimento de voz e frase de activação quando disponíveis. '+(voice&&wake?'A frase pode ser personalizada.':'Não prometas activação por voz sem suporte.'),
  'Definições > Personalidade, sistema e privacidade: comportamento, permissões, arranque e opções avançadas do Bridge. Aparência: personagens ('+looks.join(', ')+'), tamanho e movimento. Atalhos: comandos nativos. Novidades: histórico de versões.',
  'ALEC Remote: usa o interruptor Bridge · Tailscale para detectar o Tailscale e iniciar/parar o serviço. A primeira configuração ainda requer Python e a pasta V16 auditada. Não prometas QR, reconexão persistente nem chamadas proactivas nesta versão; ainda não foram disponibilizados. As permissões de Ask, ficheiros, ecrã e webcam são independentes.',
- 'Sobre apresenta apenas o logotipo e a referência Core. Não existe secção Help, Setup Guide, Show Logs ou Save Diagnostics no painel. Actualizações do ALEC são distribuídas separadamente; nunca recomendes actualizar o Roamies para actualizar o ALEC.',
+ 'Sobre apresenta o autor do ALEC, Website, Instagram e a referência Core. Não existe secção Help, Setup Guide, Show Logs ou Save Diagnostics no painel. Em Personalidade, sistema e privacidade, a opção de iniciar com o Windows controla apenas o ALEC. Actualizações do ALEC são distribuídas separadamente; nunca recomendes actualizar o Roamies para actualizar o ALEC.',
  snap?'Visão permite seleccionar uma área e analisar ou marcar o ecrã, com as permissões e modelos necessários.':'Captura de ecrã indisponível neste sistema.'
  ].join('\n');
 }
