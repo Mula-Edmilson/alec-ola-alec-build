@@ -63,7 +63,19 @@ with ThreadingHTTPServer(('127.0.0.1',0),Peer) as srv:
     assert post('/api/pair',{'code':'123456'})==(200,{'legacy':True})
     assert post('/api/pair/qr',{'ticket':'wrong','extra':True})[0]==400
     srv.shutdown()
-print('QR: single-use, expiry, rotation, concurrency and actual HTTP handler passed.')
+with tempfile.TemporaryDirectory() as d:
+    p=Path(d)/'devices.json';devices=AlecDevices(p);token=secrets.token_urlsafe(36)
+    devices.add(token);assert token not in p.read_text()
+    assert AlecDevices(p).has(token)
+    devices.revoke(token);assert not AlecDevices(p).has(token)
+    for _ in range(16):devices.add(secrets.token_urlsafe(36))
+    try:devices.add(secrets.token_urlsafe(36));raise AssertionError('limit bypass')
+    except ValueError:pass
+    devices.revoke_all();assert AlecDevices(p).count()==0
+    p.write_text('broken')
+    try:AlecDevices(p);raise AssertionError('corrupt registry accepted')
+    except ValueError:pass
+print('QR: single-use, expiry, rotation, concurrency, HTTP and persistent registry passed.')
 `;
 const check=spawnSync('python',['-c',py],{encoding:'utf8',timeout:30000});
 assert.equal(check.status,0,check.stderr||String(check.error||'Python QR test failed'));

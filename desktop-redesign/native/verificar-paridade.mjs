@@ -61,7 +61,7 @@ assert.ok(shell.includes('.skip_taskbar(true)')&&shell.includes('hide_panel(&app
 assert.ok(source.includes('if(!config.alecCursorV4){delete config.avatarPin;config.alecCursorV4=true;}')&&!source.includes("config.avatarPin={corner:'bottom-right'"),'Do not force pin on cursor-follow avatar');
 assert.ok(!source.includes('setTimeout(() => checkUpdates(), 20_000)')&&!source.includes("send({ type: 'update', install: false })"),'Do not query incompatible updater');
 assert.ok(after('showcase/panel/alec-theme.css').includes('.alec-bridge-check input[type=checkbox]'),'Remote checkbox layout fix required');
-assert.ok(panelSource.includes('Edmilson Mula')&&panelSource.includes('Digital Reach Out · Design e desenvolvimento')&&!after('showcase/panel/index.html').includes('By Ken Kai'),'Restore ALEC author only in About');
+assert.ok(panelSource.includes('Edmilson Mula')&&!panelSource.includes('Digital Reach Out')&&!after('showcase/panel/index.html').includes('By Ken Kai'),'Restore ALEC author only in About');
 assert.ok(shell.includes('KEY, "/v", "ALEC"')&&!shell.includes('KEY, "/v", "Roamies"'),'Independent Windows startup registration');
 assert.ok(source.includes('fitLocalText(alecConversationHistory(msgs)')&&source.includes('alecTextSession.base,...received.slice(at)'),'Bound local context, preserve saved history');
 assert.ok(after('showcase/panel/alec-theme.css').includes('#pane-conversations .alec-history{overflow:visible!important'),'Use same scrolling surface');

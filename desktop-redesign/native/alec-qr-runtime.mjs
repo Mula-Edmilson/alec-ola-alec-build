@@ -8,6 +8,54 @@ export function makePairMatrix(bind,ticket){
 // Only the audited managed V16 child receives this code, never the original installation.
 export const QR_PY=String.raw`
 import hmac, secrets, time
+
+import hashlib, os, re, tempfile
+from pathlib import Path
+class AlecDevices:
+    MAX = 16
+    def __init__(self, file):
+        self.file = Path(file)
+        self.lock = threading.RLock()
+        self.hashes = set()
+        try:
+            if self.file.is_symlink() or self.file.stat().st_size > 8192:
+                raise ValueError('Registo de dispositivos invalido')
+            data = json.loads(self.file.read_text(encoding='utf-8'))
+            if not isinstance(data,list) or len(data)>self.MAX or any(not isinstance(x,str) or not re.fullmatch('[a-f0-9]{64}',x) for x in data):
+                raise ValueError('Registo de dispositivos invalido')
+            self.hashes=set(data)
+        except FileNotFoundError:
+            pass
+    @staticmethod
+    def digest(token):
+        if not isinstance(token,str) or not re.fullmatch('[A-Za-z0-9_-]{48}',token):return None
+        return hashlib.sha256(token.encode('ascii')).hexdigest()
+    def has(self,token):
+        digest=self.digest(token)
+        with self.lock:return digest is not None and digest in self.hashes
+    def count(self):
+        with self.lock:return len(self.hashes)
+    def _replace(self,new):
+        self.file.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
+        fd,name=tempfile.mkstemp(prefix='.devices-',dir=self.file.parent)
+        try:
+            with os.fdopen(fd,'w',encoding='utf-8') as f:
+                json.dump(sorted(new),f);f.flush();os.fsync(f.fileno())
+            os.replace(name,self.file)
+        finally:
+            if os.path.exists(name):os.unlink(name)
+        self.hashes=new
+    def add(self,token):
+        digest=self.digest(token)
+        if digest is None:raise ValueError('Invalid token')
+        with self.lock:
+            if len(self.hashes)>=self.MAX and digest not in self.hashes:raise ValueError('Device limit')
+            self._replace(self.hashes|{digest})
+    def revoke(self,token):
+        with self.lock:self._replace(self.hashes-{self.digest(token)})
+    def revoke_all(self):
+        with self.lock:self._replace(set())
+
 from urllib.parse import urlparse
 class AlecPairWindow:
     def __init__(self, clock=time.monotonic):
@@ -30,10 +78,25 @@ class AlecPairWindow:
                 return None
             self.ticket=''
             return self.serial
-def alec_pair_handler(server,window,consumed):
+def alec_pair_handler(server,window,consumed,devices=None):
     class Handler(server.Handler):
+        def authorised(self):
+            token=self.headers.get('Authorization','')
+            token=token[7:] if token.startswith('Bearer ') else ''
+            if devices is not None and devices.has(token):return True
+            return super().authorised()
         def do_POST(self):
-            if urlparse(self.path).path!='/api/pair/qr':
+            route=urlparse(self.path).path
+            if devices is not None and route=='/api/pair/revoke':
+                self.close_connection=True
+                if not self.network_ok() or not self.authorised():return
+                token=self.headers.get('Authorization','')[7:]
+                with server.TOKEN_LOCK:
+                    try:devices.revoke(token)
+                    except OSError:return self.json_reply(503,{'error':'Não foi possível revogar.'})
+                    server.TOKENS.discard(token)
+                return self.json_reply(200,{'revoked':True})
+            if route!='/api/pair/qr':
                 return super().do_POST()
             if not self.network_ok():return
             if ipaddress.ip_address(self.client_address[0]) not in ipaddress.ip_network('100.64.0.0/10'):
@@ -51,11 +114,14 @@ def alec_pair_handler(server,window,consumed):
                 self.close_connection=True
                 return self.json_reply(400,{'error':'Pedido inválido.'})
             with server.TOKEN_LOCK:
-                if len(server.TOKENS)>=16:return self.json_reply(409,{'error':'Limite de dispositivos atingido.'})
+                if (devices.count() if devices is not None else len(server.TOKENS))>=16:return self.json_reply(409,{'error':'Limite de dispositivos atingido.'})
                 serial=window.claim(data['ticket'])
                 if serial is None:return self.json_reply(403,{'error':'QR inválido, utilizado ou expirado. Gera outro no PC.'})
                 token=secrets.token_urlsafe(36)
-                server.TOKENS.add(token)
+                if devices is not None:
+                    try:devices.add(token)
+                    except (OSError,ValueError):return self.json_reply(503,{'error':'Não foi possível guardar o dispositivo. Gera outro QR.'})
+                else:server.TOKENS.add(token)
             consumed(serial)
             return self.json_reply(200,{'token':token,'version':server.VERSION})
     return Handler
@@ -64,7 +130,7 @@ export function buildPairRunner(original){
  const start='with server.ThreadingHTTPServer((bind,server.PORT),server.Handler) as srv:';
  const watch='    def watch():\n        try: sys.stdin.buffer.read()\n        finally: srv.shutdown()';
  if(original.split(start).length!==2||original.split(watch).length!==2)throw Error('Audited V16 runner changed');
- const setup=QR_PY+"\nwindow=AlecPairWindow()\noutput_lock=threading.Lock()\ndef pair_emit(kind,payload):\n    with output_lock: print(kind+' '+json.dumps(payload),flush=True)\ndef pair_issue(): pair_emit('ALEC_MANAGED_PAIR',window.issue())\nhandler=alec_pair_handler(server,window,lambda n:pair_emit('ALEC_MANAGED_PAIR_USED',{'serial':n}))\nwith server.ThreadingHTTPServer((bind,server.PORT),handler) as srv:";
- const stdin="    pair_issue()\n    def watch():\n        try:\n            for line in sys.stdin.buffer:\n                if line.strip()==b'rotate':pair_issue()\n        finally: srv.shutdown()";
+ const setup=QR_PY+"\nwindow=AlecPairWindow()\noutput_lock=threading.Lock()\ndef pair_emit(kind,payload):\n    with output_lock: print(kind+' '+json.dumps(payload),flush=True)\ndef pair_issue(): pair_emit('ALEC_MANAGED_PAIR',window.issue())\ndevices=AlecDevices(Path(os.environ.get('LOCALAPPDATA',str(Path.home())))/'ALEC'/'Remote'/'devices.json')\nhandler=alec_pair_handler(server,window,lambda n:pair_emit('ALEC_MANAGED_PAIR_USED',{'serial':n}),devices)\nwith server.ThreadingHTTPServer((bind,server.PORT),handler) as srv:";
+ const stdin="    pair_issue()\n    def watch():\n        try:\n            for line in sys.stdin.buffer:\n                if line.strip()==b'rotate':pair_issue()\n                elif line.strip()==b'revoke-all':\n                    try:\n                        with server.TOKEN_LOCK:\n                            devices.revoke_all();server.TOKENS.clear()\n                        pair_issue()\n                    except OSError:pair_emit('ALEC_MANAGED_PAIR_ERROR',{'error':'Não foi possível revogar os dispositivos.'})\n        finally: srv.shutdown()";
  return original.replace(start,()=>setup).replace(watch,()=>stdin);
 }

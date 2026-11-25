@@ -88,7 +88,7 @@ export function interfaces(){
 export function cleanBridgeSettings(input){
   if(!input||typeof input!=='object')throw Error('Configuração inválida.');
   const dir=v=>typeof v==='string'&&v.length<=1000&&path.isAbsolute(v)&&!v.includes('\0')?path.normalize(v):null;
-  const project=dir(input.project),python=dir(input.python);
+  const project=dir(bundledProject()||input.project),python=dir(input.python);
   if(!project||!python||! /^(?:python|py)\.exe$/i.test(path.basename(python)))throw Error('Indique a pasta V16 e o caminho absoluto de python.exe ou py.exe.');
   if(!privateIPv4(input.bind)||!interfaces().includes(input.bind))throw Error('Escolha um IPv4 privado activo no PC.');
   const raw=Array.isArray(input.roots)?input.roots:[];
@@ -108,6 +108,7 @@ export function createBridgeSupervisor({changed=()=>{},ready=()=>{},closed=()=>{
   let child=null,timer=null,qrTimer=null,info={phase:'stopped'},started=null;
   const emit=(next)=>{info=next;changed();};
   function renewPairing(){if(child&&info.phase==='running'&&started?.tailnet)child.stdin.write('rotate\n');}
+  function revokeDevices(){if(child&&info.phase==='running'&&started?.tailnet)child.stdin.write('revoke-all\n');}
   function stop(){
     if(!child)return;
     clearTimeout(timer);clearTimeout(qrTimer); const c=child;
@@ -150,6 +151,7 @@ export function createBridgeSupervisor({changed=()=>{},ready=()=>{},closed=()=>{
             }catch{clearTimeout(qrTimer);emit({...info,qr:null});}
             continue;
           }
+          if(line.startsWith('ALEC_MANAGED_PAIR_ERROR ')){emit({...info,pairError:'Não foi possível revogar os dispositivos.'});continue;}
           if(line.startsWith('ALEC_MANAGED_PAIR_USED ')){
             try{const v=JSON.parse(line.slice('ALEC_MANAGED_PAIR_USED '.length));if(info.qr?.serial===v.serial){clearTimeout(qrTimer);emit({...info,qr:null,paired:true});}}catch{}
             continue;
@@ -173,5 +175,5 @@ export function createBridgeSupervisor({changed=()=>{},ready=()=>{},closed=()=>{
     timer=setTimeout(()=>{if(child===c&&info.phase==='starting'){failure='Tempo limite no arranque. Confirme Python e porta 8765.';c.kill();}},20000);timer.unref();
     return settings;
   }
-  return {start,stop,renewPairing,snapshot:()=>({...info,interfaces:interfaces(),defaults:{project:bundledProject(),python:pythonDefault()}}),settings:()=>started};
+  return {start,stop,renewPairing,revokeDevices,snapshot:()=>({...info,interfaces:interfaces(),defaults:{project:bundledProject(),python:pythonDefault()}}),settings:()=>started};
 }
