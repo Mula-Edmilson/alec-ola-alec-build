@@ -315,9 +315,11 @@ function panel() {`);
   rep(pj,"needs(`Say “Hey ${v.wakeName || 'Roamies'}” to talk. Mic stays on.`)","needs(`Diz “${v.alecWakePhrase || ('Hey '+(v.wakeName || 'Roamies'))}” para falar. Microfone em escuta.`)");
   rep(wv,"                // Roamies is answering or speaking: don't listen for the phrase (it mustn't wake itself).","                Some(\"wake_phrase\") => {\n                    let previous = self.wake.phrase().to_vec();\n                    let ok = self.wake.set_phrase(msg.get(\"phrase\").and_then(Value::as_str).unwrap_or(\"\"));\n                    if ok && previous.as_slice() != self.wake.phrase() { self.stop_wake(); }\n                    log(if ok { \"wake phrase configured\" } else { \"wake phrase refused\" });\n                }\n                // Roamies is answering or speaking: don't listen for the phrase (it mustn't wake itself).");
 
+  rep("showcase/onboarding/onboarding.js","['jarvis', 'JARVIS']","['jarvis', 'ALEC']");
+  rep(pj,"['jarvis', 'JARVIS']","['jarvis', 'ALEC']");
   return {out,changes};
 }
-const paths=["showcase/tauri/sidecar/sidekick.mjs","showcase/tauri/sidecar/speaker.mjs","showcase/tauri/sidecar/fish.mjs","showcase/tauri/sidecar/local.mjs","showcase/panel/index.html","showcase/panel/panel.js","showcase/panel/panel.css","showcase/roamies/12-sidekick.js","showcase/roamies/jarvis.js","showcase/desktop.html","showcase/tauri/src-tauri/tauri.conf.json","showcase/tauri/src-tauri/src/main.rs","showcase/tauri/src-tauri/voice-win/src/wake.rs","showcase/tauri/src-tauri/voice-win/src/main.rs"];
+const paths=["showcase/tauri/sidecar/sidekick.mjs","showcase/tauri/sidecar/speaker.mjs","showcase/tauri/sidecar/fish.mjs","showcase/tauri/sidecar/local.mjs","showcase/panel/index.html","showcase/panel/panel.js","showcase/panel/panel.css","showcase/roamies/12-sidekick.js","showcase/roamies/jarvis.js","showcase/desktop.html","showcase/tauri/src-tauri/tauri.conf.json","showcase/tauri/src-tauri/src/main.rs","showcase/tauri/src-tauri/voice-win/src/wake.rs","showcase/tauri/src-tauri/voice-win/src/main.rs","showcase/onboarding/onboarding.js"];
 const [rootArg,legacyArg,bridgeArg]=process.argv.slice(2);
 if(!rootArg||!legacyArg){console.error('Usage: node preparar-fonte.mjs <fresh-upstream-checkout> <private-sidekick.mjs> [extracted-V16-project]');process.exit(1);}
 const root=path.resolve(rootArg);
