@@ -39,6 +39,7 @@ jobs:
           node desktop-redesign/native/verificar-paridade.mjs upstream
           node desktop-redesign/native/testar-tailnet.mjs
           node desktop-redesign/native/testar-voz-alec.mjs
+          node desktop-redesign/native/testar-contexto-local.mjs
       - name: Install locked sidecar dependencies
         working-directory: upstream/showcase/tauri/sidecar
         shell: bash
@@ -134,6 +135,16 @@ jobs:
               if (Get-ChildItem $logs -Filter *.log -ErrorAction SilentlyContinue | Select-String -Pattern ' start ' -Quiet) { $started=$true; break }
             }
             if (-not ($started -and -not $run.HasExited)) { throw 'Installed sidecar did not start' }
+            $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+            $expectedStartup = '"' + $app.FullName + '"'
+            $startup = $null
+            for ($i=0; $i -lt 20; $i++) {
+              $startup = Get-ItemPropertyValue -Path $runKey -Name ALEC -ErrorAction SilentlyContinue
+              if ($startup -eq $expectedStartup) { break }
+              Start-Sleep -Seconds 1
+            }
+            if ($startup -ne $expectedStartup) { throw 'ALEC independent autostart was not registered to the installed EXE' }
+            Write-Host 'ALEC independent autostart verified against installed executable.'
             Start-Process -FilePath $app.FullName -ArgumentList '--panel'
             $reportPath = Join-Path $data 'alec-native-visual-report.json'
             for ($i=0; $i -lt 100; $i++) {
@@ -168,16 +179,16 @@ jobs:
           }
           $out = Join-Path $env:GITHUB_WORKSPACE 'candidate'
           New-Item -ItemType Directory -Force $out | Out-Null
-          $dest = Join-Path $out 'ALEC-Desktop-0.1.51-Native-v7.0.1-x64-candidate-setup.exe'
+          $dest = Join-Path $out 'ALEC-Desktop-0.1.51-Native-v7.0.2-x64-candidate-setup.exe'
           Copy-Item $setup.FullName $dest
           $hash = (Get-FileHash $dest -Algorithm SHA256).Hash.ToLowerInvariant()
-          Set-Content (Join-Path $out 'SHA256.txt') "$hash  ALEC-Desktop-0.1.51-Native-v7.0.1-x64-candidate-setup.exe"
+          Set-Content (Join-Path $out 'SHA256.txt') "$hash  ALEC-Desktop-0.1.51-Native-v7.0.2-x64-candidate-setup.exe"
       - name: Include corresponding source and license
         shell: bash
         run: |
           git -C upstream diff --binary HEAD > candidate/ALEC-source.patch
           mkdir -p candidate/new-source
-          git -C upstream ls-files --others --exclude-standard -- showcase/tauri/sidecar/alec-voice-preference.mjs showcase/tauri/sidecar/alec-legacy-profile.mjs showcase/tauri/sidecar/alec-skill-hub.mjs showcase/tauri/sidecar/alec-bridge-supervisor.mjs showcase/panel/alec-theme.css showcase/tauri/sidecar/alec-wake-phrase.mjs showcase/tauri/sidecar/test/alec-wake-phrase.test.mjs | while IFS= read -r f; do
+          git -C upstream ls-files --others --exclude-standard -- showcase/tauri/sidecar/alec-local-context.mjs showcase/tauri/sidecar/alec-voice-preference.mjs showcase/tauri/sidecar/alec-legacy-profile.mjs showcase/tauri/sidecar/alec-skill-hub.mjs showcase/tauri/sidecar/alec-bridge-supervisor.mjs showcase/panel/alec-theme.css showcase/tauri/sidecar/alec-wake-phrase.mjs showcase/tauri/sidecar/test/alec-wake-phrase.test.mjs | while IFS= read -r f; do
             mkdir -p "candidate/new-source/$(dirname "$f")"
             cp "upstream/$f" "candidate/new-source/$f"
           done
@@ -187,7 +198,7 @@ jobs:
           git rev-parse HEAD >> candidate/SOURCE.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: ALEC-Desktop-Native-v7.0.1-Windows-x64-candidate
+          name: ALEC-Desktop-Native-v7.0.2-Windows-x64-candidate
           path: candidate/
           if-no-files-found: error
           retention-days: 30
