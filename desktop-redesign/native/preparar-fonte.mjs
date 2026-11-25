@@ -53,21 +53,27 @@ function prepareSources(files, profile) {
   // Re-register chat models without elevating their privileges. Text-only requests do not get tools or images.
   rep(lo,"export const localModels = (probes, windows = new Map()) => toolModels(probes, windows).filter((m) => m.supportsImages);",`export const localModels = (probes, windows = new Map()) => toolModels(probes, windows).filter((m) => m.supportsImages);
 const alecChatModels = (probes, windows = new Map()) => probes.filter(p => p.reachable).flatMap(p => p.models.filter(m => m.supportsChat !== false).map(m => {
-  const info = toModelInfo(m, p.endpoint);
+  const info = {...toModelInfo(m, p.endpoint), supportsTools:m.supportsTools===true, supportsImages:m.supportsImages===true};
   if (m.contextWindowKnown) return info;
   if (windows.has(info.id)) return withWindow(info, windows.get(info.id));
   return p.endpoint.custom ? withWindow(info, MIN_CONTEXT) : info;
 }));`);
   rep(lo,"const p = await probe(key ? { ...server, apiKey: key } : server, { timeoutMs: 1500 });","const p = await probe(key ? { ...server, apiKey: key } : server, { timeoutMs: server.custom && server.baseUrl.startsWith('https://') ? 12000 : 1500 });");
-  rep(lo,"const usable = toolModels([p], windows), models = usable.filter((m) => m.supportsImages);","const usable = alecChatModels([p], windows), models = usable;");
-  rep(lo,"text: usable.length - models.length","text: usable.filter(m => !m.supportsImages).length");
+  rep(lo,"{ save = false, apiKey, windows, probe = probeEndpoint } = {}","{ save = false, apiKey, windows, probe = probeEndpoint, conversation = false } = {}");
+  rep(lo,"const usable = toolModels([p], windows), models = usable.filter((m) => m.supportsImages);","const usable = conversation ? alecChatModels([p], windows) : toolModels([p], windows), models = conversation ? usable : usable.filter(m => m.supportsImages);");
+  rep(lo,"{ windows, probe } = {})","{ windows, probe, conversation = false } = {})");
+  rep(lo,"connectLocal(auth, s, { windows, probe })","connectLocal(auth, s, { windows, probe, conversation })");
+  rep(sc,"syncServers(auth, servers(), { windows: local.windows })","syncServers(auth, servers(), { windows: local.windows, conversation:true })");
+  rep(sc,"connectLocal(auth, s, { save: true, windows: local.windows })","connectLocal(auth, s, { save: true, windows: local.windows, conversation:true })");
+  rep(sc,"connectLocal(auth, s, { save: true, apiKey: key || undefined, windows: local.windows })","connectLocal(auth, s, { save: true, apiKey: key || undefined, windows: local.windows, conversation:true })");
+  rep(lo,"text: usable.length - models.length","text: conversation ? usable.filter(m => m.supportsTools && !m.supportsImages).length : usable.length - models.length");
   rep(sc,"const canRun = (p, id) => !!signedIn.get(p) && seesImages(p, id) && getAuthStorageKeys(p, id).some((k) => k === p || storedKeys.has(k));",`const alecConversationOnly = (provider, model) => provider === 'local' && !!model && (model.supportsTools === false || model.supportsImages !== true);
 const alecConversationNow = () => alecConversationOnly(config.provider, getModel(config.model));
 const canRun = (p, id) => !!signedIn.get(p) && (p === 'local' || seesImages(p,id)) && getAuthStorageKeys(p,id).some(k => k === p || storedKeys.has(k));`);
   // Preserve upstream text-only subagents, while filtering unsupported models from the crew via crewSpec.
   rep(sc,"const crewNow = () => (config.subagents ?","const crewNow = () => (config.subagents && !alecConversationNow() ?");
   rep(sc,"const hybridActive = () => !!config.hybrid && hybridOn(config.heavy);","const hybridActive = () => !!config.hybrid && !alecConversationNow() && hybridOn(config.heavy);");
-  rep(sc,"const runnableSpec = (p, id) => canRun(p, id) || (p === 'local' && !!signedIn.get('local') && !!parseLocalModelId(id ?? ''));","const runnableSpec = (p,id) => (p !== 'local' || (getModel(id)?.supportsTools !== false && getModel(id)?.supportsImages === true)) && (canRun(p,id) || (p === 'local' && !!signedIn.get('local') && !!parseLocalModelId(id ?? '')));");
+  rep(sc,"const runnableSpec = (p, id) => canRun(p, id) || (p === 'local' && !!signedIn.get('local') && !!parseLocalModelId(id ?? ''));","const runnableSpec = (p,id) => (p !== 'local' || ((!getModel(id) || (getModel(id)?.supportsTools !== false && getModel(id)?.supportsImages === true)))) && (canRun(p,id) || (p === 'local' && !!signedIn.get('local') && !!parseLocalModelId(id ?? '')));");
   rep(sc,"const crewSpec = (p, id) => runnableSpec(p, id) || canRunText(p, id);","const crewSpec = (p,id) => runnableSpec(p,id) || (canRunText(p,id) && (p !== 'local' || getModel(id)?.supportsTools !== false));");
   rep(sc,"if (config.backups) (config.fallbacks","if (config.backups && !alecConversationNow()) (config.fallbacks");
   rep(sc,"if (!system && config.hybrid) {","if (!system && config.hybrid && !alecConversationNow()) {");
