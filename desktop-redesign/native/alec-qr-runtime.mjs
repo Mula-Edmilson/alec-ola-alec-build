@@ -23,7 +23,7 @@ class AlecPairWindow:
             self.until=self.clock()+120
             return {'serial':self.serial,'ticket':self.ticket,'ttl':120}
     def claim(self, ticket):
-        if not isinstance(ticket,str) or len(ticket)!=32:
+        if not isinstance(ticket,str) or len(ticket)!=32 or not all(c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-' for c in ticket):
             return None
         with self.lock:
             if self.clock()>=self.until or not self.ticket or not hmac.compare_digest(ticket,self.ticket):
