@@ -317,9 +317,11 @@ function panel() {`);
 
   rep("showcase/onboarding/onboarding.js","['jarvis', 'JARVIS']","['jarvis', 'ALEC']");
   rep(pj,"['jarvis', 'JARVIS']","['jarvis', 'ALEC']");
+  // Strengthen the upstream structural assertion to require the added conversation-only gate.
+  rep("showcase/tauri/sidecar/test/prompt.test.mjs","assert.match(side, /const agentish = !intro && !news && wantsAgent\\(text\\);/, 'a news turn never hatches an agent');","assert.match(side, /const agentish = !alecConversationNow\\(\\) && !intro && !news && wantsAgent\\(text\\);/, 'neither a conversation-only model nor a news turn hatches an agent');");
   return {out,changes};
 }
-const paths=["showcase/tauri/sidecar/sidekick.mjs","showcase/tauri/sidecar/speaker.mjs","showcase/tauri/sidecar/fish.mjs","showcase/tauri/sidecar/local.mjs","showcase/panel/index.html","showcase/panel/panel.js","showcase/panel/panel.css","showcase/roamies/12-sidekick.js","showcase/roamies/jarvis.js","showcase/desktop.html","showcase/tauri/src-tauri/tauri.conf.json","showcase/tauri/src-tauri/src/main.rs","showcase/tauri/src-tauri/voice-win/src/wake.rs","showcase/tauri/src-tauri/voice-win/src/main.rs","showcase/onboarding/onboarding.js"];
+const paths=["showcase/tauri/sidecar/sidekick.mjs","showcase/tauri/sidecar/speaker.mjs","showcase/tauri/sidecar/fish.mjs","showcase/tauri/sidecar/local.mjs","showcase/panel/index.html","showcase/panel/panel.js","showcase/panel/panel.css","showcase/roamies/12-sidekick.js","showcase/roamies/jarvis.js","showcase/desktop.html","showcase/tauri/src-tauri/tauri.conf.json","showcase/tauri/src-tauri/src/main.rs","showcase/tauri/src-tauri/voice-win/src/wake.rs","showcase/tauri/src-tauri/voice-win/src/main.rs","showcase/onboarding/onboarding.js","showcase/tauri/sidecar/test/prompt.test.mjs"];
 const [rootArg,legacyArg,bridgeArg]=process.argv.slice(2);
 if(!rootArg||!legacyArg){console.error('Usage: node preparar-fonte.mjs <fresh-upstream-checkout> <private-sidekick.mjs> [extracted-V16-project]');process.exit(1);}
 const root=path.resolve(rootArg);
