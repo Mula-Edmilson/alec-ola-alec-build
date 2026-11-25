@@ -47,6 +47,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
+          components: rustfmt
+      - name: Parse transformed native Rust before expensive compilation
+        shell: bash
+        run: |
+          rustfmt --edition 2021 --emit stdout --config skip_children=true upstream/showcase/tauri/src-tauri/src/main.rs > /dev/null
+          rustfmt --edition 2021 --emit stdout --config skip_children=true upstream/showcase/tauri/src-tauri/src/voice.rs > /dev/null
       - name: Test original and configurable native wake matcher
         shell: bash
         run: |
