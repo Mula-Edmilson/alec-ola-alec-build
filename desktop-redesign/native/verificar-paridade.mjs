@@ -11,14 +11,15 @@ const allowed=new Set([
  'showcase/tauri/sidecar/fish.mjs','showcase/tauri/sidecar/local.mjs',
  'showcase/panel/index.html','showcase/panel/panel.js','showcase/panel/panel.css',
  'showcase/roamies/12-sidekick.js','showcase/roamies/jarvis.js','showcase/desktop.html',
- 'showcase/tauri/src-tauri/tauri.conf.json','showcase/tauri/src-tauri/src/main.rs'
+ 'showcase/tauri/src-tauri/tauri.conf.json','showcase/tauri/src-tauri/src/main.rs',
+ 'showcase/tauri/src-tauri/voice-win/src/main.rs','showcase/tauri/src-tauri/voice-win/src/wake.rs'
 ]);
 for(const line of git('diff','--name-status','HEAD').trim().split('\n').filter(Boolean)){
  const [status,file]=line.trimEnd().split('\t');
  assert.equal(status,'M','No native source deletion, rename or replacement allowed: '+line);
  assert.ok(allowed.has(file),'Unexpected modification: '+file);
 }
-const newAllowed=new Set(['showcase/panel/alec-theme.css','showcase/tauri/sidecar/alec-bridge-supervisor.mjs','showcase/tauri/sidecar/alec-skill-hub.mjs','showcase/tauri/sidecar/alec-legacy-profile.mjs']);
+const newAllowed=new Set(['showcase/panel/alec-theme.css','showcase/tauri/sidecar/alec-bridge-supervisor.mjs','showcase/tauri/sidecar/alec-skill-hub.mjs','showcase/tauri/sidecar/alec-legacy-profile.mjs','showcase/tauri/sidecar/alec-wake-phrase.mjs','showcase/tauri/sidecar/test/alec-wake-phrase.test.mjs']);
 for(const f of git('ls-files','--others','--exclude-standard').trim().split('\n').filter(Boolean))assert.ok(newAllowed.has(f),'Unexpected added source: '+f);
 const before=f=>git('show','HEAD:'+f).replace(/\r\n/g,'\n');
 const after=f=>readFileSync(path.join(root,f),'utf8').replace(/\r\n/g,'\n');
@@ -34,4 +35,7 @@ assert.ok(source.includes('tools: textChat ? [] : config.lite ? tools.filter((t)
 assert.ok(source.includes('const textChat = alecConversationOnly(config.provider,m);'),'Text-only gate missing');
 assert.ok(source.includes('const alecConversationOnly = (provider, model) => provider === \'local\''),'Text-only gating must be restricted to local-compatible models');
 assert.ok(source.includes('alecContext.run(remoteDevice'),'Remote context missing');
+assert.ok(after('showcase/tauri/src-tauri/voice-win/src/wake.rs').includes('fn full_phrase_custom_and_native_fallback()'),'Missing wake phrase regression test');
+assert.ok(after('showcase/tauri/src-tauri/voice-win/src/wake.rs').includes('fn the_phrase_and_its_near_misses()'),'Missing original wake tests');
+assert.ok(after('showcase/tauri/src-tauri/voice-win/src/main.rs').includes('Some("wake_phrase")'),'Missing helper protocol');
 console.log('Parity source gate OK: '+protectedPaths.length+' original tracked paths protected; all native script references preserved. Runtime behavior still requires tests.');
