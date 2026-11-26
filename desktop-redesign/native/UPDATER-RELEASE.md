@@ -1,0 +1,16 @@
+# ALEC updater — protected release procedure
+
+The production key must be generated and retained by the owner outside the source tree and chat. Never reuse Roamies keys. Use the Tauri v2 CLI signer generate command with a nonempty passphrase and keep an encrypted offline backup. The Tauri updater signature is not Windows Authenticode; SmartScreen may still warn.
+
+1. In repository Settings > Environments, create `alec-signing` and restrict deployments to branch `alec-signed-updater`. Require a reviewer where available. Review the exact source and build workflow before approving every signing job. Do not grant signing secrets to the general repository, forks or the `alec-candidate` environment.
+2. Set environment secrets `ALEC_UPDATER_PRIVATE_KEY` (contents of the private Tauri key) and `ALEC_UPDATER_PRIVATE_KEY_PASSWORD` (its passphrase). Never place either in source, logs, issues or release assets.
+3. Under repository Actions Variables, set `ALEC_UPDATER_PUBLIC_KEY` to the public Tauri key file's contents. This is the trust root, not a secret. Verify it against the offline copy. Changes to the root require a new manual bootstrap installation; do not silently rotate keys.
+4. Trigger a new reviewed commit to the signed-updater branch. Its Windows build selects the protected signing environment when the public variable is present, fails closed if signing credentials are missing and uploads the installer, detached signature, latest.json, checksum, corresponding source and license only after checks. No automatic publishing.
+5. Inspect the completed artifact. Run verify-alec-release.mjs on the extracted package. This checks consistency, not cryptographic authenticity. Test the actual signed installer on a clean Windows user and a backed-up ALEC profile; verify settings, memory, skills, providers, first-run UI and startup. Keep the old installer and a secure local backup.
+6. Publish a reviewed GitHub prerelease with numeric tag v0.2.0 (or the exact manifest version), signed installer, signature, latest.json, checksum, source and license. Do not overwrite a published version's assets. Release notes must describe real limitations. Preview users opt in; Stable users skip prereleases.
+7. Bump ALEC version to 0.2.1 on the reviewed branch, rebuild with the same key, test and publish a Preview. On Windows verify discovery, notes, explicit approval, valid signature acceptance, restart and persistence; also test tampered installer/incorrect signature and stale/downgrade feed rejection without executing untrusted binaries. Use a disposable test machine for negative tests, never modify a public release's assets.
+8. Test manual recovery using the previous trusted installer and local backup on a disposable profile. Automatic rollback is NOT implemented. Do not claim that upgrade/recovery is validated until these checks are observed.
+
+Production release remains blocked until key provisioning and end-to-end tests. The updater is disabled for unsigned builds. No live Supabase migration is part of this process.
+
+Reference: https://v2.tauri.app/plugin/updater/
