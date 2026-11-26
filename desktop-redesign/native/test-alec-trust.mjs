@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createTrust} from './alec-trust.mjs';
+const desktop={kind:'desktop',id:'local',verified:true};
+const remote={kind:'remote',id:'phone',verified:true};
+const base={capability:'files.read',origin:desktop,scope:'project:alpha'};
+const grant={...base,ttl:1000,approvedBy:'local-user'};
+test('deny by default and reject unapproved grants',()=>{const t=createTrust();assert.equal(t.authorize(base).allowed,false);assert.throws(()=>t.grant({...grant,approvedBy:'model'}));assert.throws(()=>t.grant({...grant,scope:'*'}));assert.throws(()=>t.grant({...grant,origin:{...desktop,verified:false}}));});
+test('grant exact origin, resource and capability only',()=>{const t=createTrust();t.grant(grant);assert.equal(t.authorize(base).allowed,true);for(const change of [{origin:remote},{scope:'project:beta'},{capability:'files.write'},{origin:{...desktop,verified:false}},{origin:{...desktop,id:'other'}}])assert.equal(t.authorize({...base,...change}).allowed,false);});
+test('expiration, revocation and sanitized audit',()=>{let now=100;const events=[];const t=createTrust({clock:()=>now,audit:e=>events.push(e)});const a=t.grant(grant);assert.equal(t.authorize(base).allowed,true);assert.equal(t.revoke(a.id),true);assert.equal(t.authorize(base).allowed,false);t.grant(grant);now+=1000;assert.equal(t.authorize(base).allowed,false);assert.equal(t.list().length,0);assert.ok(events.every(e=>!Object.hasOwn(e,'scope')));});
+test('audit failure blocks grants',()=>{const t=createTrust({audit:()=>{throw Error('audit unavailable');}});assert.throws(()=>t.grant(grant));assert.equal(t.list().length,0);});
