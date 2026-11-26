@@ -27,6 +27,7 @@ for(const line of git('diff','--name-status','HEAD').trim().split('\n').filter(B
  assert.ok(allowed.has(file),'Unexpected modification: '+file);
 }
 const newAllowed=new Set(['showcase/tauri/sidecar/alec-qr-runtime.mjs','showcase/tauri/sidecar/alec-qrcode.cjs','showcase/tauri/sidecar/alec-local-context.mjs','showcase/tauri/sidecar/alec-voice-preference.mjs','showcase/panel/alec-theme.css','showcase/tauri/sidecar/alec-bridge-supervisor.mjs','showcase/tauri/sidecar/alec-skill-hub.mjs','showcase/tauri/sidecar/alec-legacy-profile.mjs','showcase/tauri/sidecar/alec-wake-phrase.mjs','showcase/tauri/sidecar/test/alec-wake-phrase.test.mjs']);
+newAllowed.add('showcase/tauri/sidecar/alec-sigma-vision.mjs');
 for(const f of git('ls-files','--others','--exclude-standard').trim().split('\n').filter(Boolean))assert.ok(newAllowed.has(f),'Unexpected added source: '+f);
 const before=f=>git('show','HEAD:'+f).replace(/\r\n/g,'\n');
 const after=f=>readFileSync(path.join(root,f),'utf8').replace(/\r\n/g,'\n');
@@ -38,7 +39,8 @@ assert.ok(protectedPaths.length>30,'Native module inventory incomplete');
 const tools=after(core+'tools.mjs');
 for(const n of ['draw','take_screenshot','read_window','act_in_app','pointer_drag','read_file','list_files','search_files','write_file','run_command','open','use_skill','install_skill','schedule_job','remember_commitment'])assert.ok(tools.includes("name: '"+n+"'"),'Missing native tool: '+n);
 const source=after(core+'sidekick.mjs');
-assert.ok(source.includes('tools: textChat ? [] : config.lite ? tools.filter((t) => LITE_TOOLS.has(t.name)) : tools'),'Full tool set must remain in full mode');
+assert.ok(source.includes('tools: textChat ? [] : tools.filter(t=>(!config.lite||LITE_TOOLS.has(t.name))&&(!SIGMA_TOOL_NAMES.has(t.name)||alecSigma.available()))'),'Native tool availability and Sigma security gates must remain intact');
+assert.equal(after(core+'alec-sigma-vision.mjs'),readFileSync(new URL('./alec-sigma-vision.mjs',import.meta.url),'utf8').replace(/\r\n/g,'\n'),'Sigma module integrity mismatch');
 assert.ok(source.includes('const textChat = alecConversationOnly(config.provider,m);'),'Text-only gate missing');
 assert.ok(source.includes('const alecConversationOnly = (provider, model) => provider === \'local\''),'Text-only gating must be restricted to local-compatible models');
 assert.ok(source.includes('alecContext.run(remoteDevice'),'Remote context missing');
