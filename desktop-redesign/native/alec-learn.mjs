@@ -1,7 +1,7 @@
 // A bounded recorder of successful, structured operation categories, not a screen/key logger.
 // The native caller must authenticate the origin and report only actual completed operations.
 import {randomUUID} from 'node:crypto';
-const operations=new Set(['files.read','files.write','screen.read','camera.read','app.control','command.run','skill.run']);
+const operations=new Set(['files.read','files.write','screen.read','camera.read','app.control','command.run','skill.run','skill.import']);
 export function createLearnRecorder({trust,clock=Date.now}={}){
  if(typeof trust?.authorize!=='function')throw Error('Trust required');
  let session=null;
