@@ -1,0 +1,13 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {randomBytes} from 'node:crypto';
+import {sealKnowledge,openKnowledge} from './alec-cloud.mjs';
+import {createEvolution} from './alec-evolution.mjs';
+import {createTrust} from './alec-trust.mjs';
+const key=randomBytes(32);
+const item={id:'one',type:'preference',title:'Interface',text:'Prefer compact layouts',approved:true};
+const local={kind:'desktop',id:'local',verified:true};
+const evolution={kind:'evolution',id:'agent',verified:true};
+test('encrypted roundtrip strips metadata and requires fresh review',()=>{const a=sealKnowledge([{...item,device:'private',permissions:['admin'],token:'hidden'}],key);assert.ok(!a.includes(item.text));assert.notEqual(a,sealKnowledge([item],key));assert.deepEqual(openKnowledge(a,key),[{...item,approved:false}]);assert.throws(()=>openKnowledge(a,randomBytes(32)));const bytes=Buffer.from(a,'base64');bytes[bytes.length-1]^=1;assert.throws(()=>openKnowledge(bytes.toString('base64'),key));});
+test('deny sensitive indicators and unreviewed records',()=>{for(const text of ['API key example','password example','IBAN example','social media account','1234 5678 9012 3456'])assert.throws(()=>sealKnowledge([{...item,text}],key));assert.throws(()=>sealKnowledge([{...item,approved:false}],key));assert.throws(()=>sealKnowledge([{...item,type:'permissions'}],key));});
+test('evolution requires scoped grant and local review; no installation method',()=>{const trust=createTrust();const engine=createEvolution({trust});const proposal={area:'performance',title:'Reduce polling',summary:'Evaluate idle refresh interval'};assert.throws(()=>engine.propose(evolution,proposal));trust.grant({capability:'evolution.propose',origin:evolution,scope:'improvements',ttl:5000,approvedBy:'local-user'});assert.throws(()=>engine.propose(evolution,{...proposal,area:'security'}));const p=engine.propose(evolution,proposal);assert.equal(p.state,'pending');assert.throws(()=>engine.review(evolution,p.id,'approve-testing'));assert.equal(engine.review(local,p.id,'approve-testing').state,'approved-for-testing');assert.equal(engine.install,undefined);assert.throws(()=>engine.review(local,p.id,'approve-testing'));});
