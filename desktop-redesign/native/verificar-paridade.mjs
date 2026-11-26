@@ -106,5 +106,6 @@ assert.equal(updaterConfig.version,JSON.parse(readFileSync(new URL('./alec-versi
 assert.deepEqual(updaterConfig.plugins.updater.endpoints,['https://github.com/Mula-Edmilson/alec-ola-alec-build/releases/latest/download/latest.json']);
 assert.equal(updaterConfig.plugins.updater.pubkey,(process.env.ALEC_UPDATER_PUBLIC_KEY||'').trim());
 assert.equal(updaterConfig.bundle.createUpdaterArtifacts,!!updaterConfig.plugins.updater.pubkey);
+assert.ok(shell.indexOf('#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]')>=0&&shell.indexOf('#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]')<shell.indexOf('const ALEC_SIGNED_UPDATE: bool'),'Rust crate attribute must precede updater declaration');
 assert.ok(shell.includes('update.download_and_install')&&shell.includes('update.version!=expected')&&shell.includes('!ALEC_SIGNED_UPDATE'),'Native signed installer gate');
 console.log('Parity source gate OK: '+protectedPaths.length+' original tracked paths protected; all native script references preserved. Runtime behavior still requires tests.');
