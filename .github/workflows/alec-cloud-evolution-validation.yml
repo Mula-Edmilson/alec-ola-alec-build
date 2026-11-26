@@ -1,0 +1,37 @@
+name: ALEC Cloud and Evolution validation
+on:
+  workflow_dispatch:
+  push:
+    branches: [alec-cloud-evolution]
+permissions:
+  contents: read
+concurrency:
+  group: alec-cloud-evolution-validation
+  cancel-in-progress: true
+jobs:
+  policy:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Policy, Learn and Update unit tests
+        run: node --test desktop-redesign/native/test-alec-trust.mjs desktop-redesign/native/test-alec-learn.mjs desktop-redesign/native/test-alec-update.mjs desktop-redesign/native/test-alec-cloud-evolution.mjs
+      - name: Validate desktop integration
+        shell: bash
+        run: |
+          git clone --branch v0.1.51 --depth 1 https://github.com/KenKaiii/Roamies.git upstream
+          test "$(git -C upstream rev-parse HEAD)" = "362645466349f4c520ad453d94a94c2481776c2f"
+          node desktop-redesign/native/preparar-fonte.mjs upstream --public
+          node --check upstream/showcase/tauri/sidecar/sidekick.mjs
+          node --check upstream/showcase/panel/panel.js
+          node desktop-redesign/native/verificar-paridade.mjs upstream
+      - name: Install locked sidecar dependencies
+        working-directory: upstream/showcase/tauri/sidecar
+        run: npm ci
+      - name: Full sidecar regressions
+        run: node desktop-redesign/native/executar-testes.mjs upstream/showcase/tauri/sidecar/test
