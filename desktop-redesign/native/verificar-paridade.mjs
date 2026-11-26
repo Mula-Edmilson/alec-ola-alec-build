@@ -16,7 +16,7 @@ const allowed=new Set([
  'showcase/tauri/sidecar/fish.mjs','showcase/tauri/sidecar/local.mjs',
  'showcase/panel/index.html','showcase/panel/panel.js','showcase/panel/panel.css',
  "showcase/roamies/glass.js","showcase/roamies/agent.js","showcase/roamies/agent-cards.js","showcase/roamies/agent-panel.js","showcase/roamies/ink.js","showcase/roamies/sidebar.js","showcase/roamies/notch.js",
- 'showcase/roamies/12-sidekick.js','showcase/roamies/jarvis.js','showcase/roamies/10-dither.js','showcase/roamies/ask-bar.js','showcase/roamies/core.js','showcase/roamies/host.js','showcase/desktop.html','showcase/onboarding/onboarding.js',
+ 'showcase/roamies/12-sidekick.js','showcase/roamies/jarvis.js','showcase/roamies/10-dither.js','showcase/roamies/ask-bar.js','showcase/roamies/core.js','showcase/roamies/host.js','showcase/desktop.html','showcase/onboarding/onboarding.js','showcase/onboarding/index.html',
  'showcase/tauri/src-tauri/tauri.conf.json','showcase/tauri/src-tauri/src/main.rs',
  'showcase/tauri/src-tauri/src/voice.rs',
  'showcase/tauri/src-tauri/voice-win/src/main.rs','showcase/tauri/src-tauri/voice-win/src/wake.rs'
@@ -34,7 +34,7 @@ for(const f of git('ls-files','--others','--exclude-standard').trim().split('\n'
 const before=f=>git('show','HEAD:'+f).replace(/\r\n/g,'\n');
 const after=f=>readFileSync(path.join(root,f),'utf8').replace(/\r\n/g,'\n');
 const refs=s=>[...s.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g)].map(m=>m[1]);
-for(const file of ['showcase/desktop.html','showcase/panel/index.html']) assert.deepEqual(refs(after(file)),refs(before(file)),file+': native script chain');
+for(const file of ['showcase/desktop.html','showcase/panel/index.html','showcase/onboarding/index.html']) assert.deepEqual(refs(after(file)),refs(before(file)),file+': native script chain');
 const core='showcase/tauri/sidecar/';
 const protectedPaths=git('ls-files','showcase/roamies',core,'showcase/tauri/src-tauri/hands-win','showcase/tauri/src-tauri/voice-win').trim().split('\n').filter(f=>!allowed.has(f));
 assert.ok(protectedPaths.length>30,'Native module inventory incomplete');
@@ -94,4 +94,6 @@ assert.equal(after("showcase/tauri/sidecar/test/fish.test.mjs"),before("showcase
 assert.ok(source.includes('alec_bridge_qr_renew')&&panelSource.includes('alecPairingCard')&&panelSource.includes('Código QR temporário'),'Native QR pairing controls');
 assert.ok(after(core+'alec-qr-runtime.mjs').includes("'/api/pair/qr'")&&after(core+'alec-qr-runtime.mjs').includes('self.until=self.clock()+120')&&after(core+'alec-qr-runtime.mjs').includes('hmac.compare_digest'),'One-use private pairing endpoint');
 assert.ok(after(core+'alec-qrcode.cjs').includes('MIT License'),'QR dependency license retained');
+assert.ok(source.includes("if(l!=='jarvis')return;")&&source.includes("looks: LOOKS.filter(([id])=>id==='jarvis')"),'Only ALEC is selectable');
+assert.ok(after('showcase/onboarding/onboarding.js').includes("look.radios('looks', LOOKS.filter(([id])=>id==='jarvis'), 'jarvis'")&&after('showcase/onboarding/index.html').includes('Bem-vindo ao ALEC'),'ALEC first-run identity');
 console.log('Parity source gate OK: '+protectedPaths.length+' original tracked paths protected; all native script references preserved. Runtime behavior still requires tests.');
