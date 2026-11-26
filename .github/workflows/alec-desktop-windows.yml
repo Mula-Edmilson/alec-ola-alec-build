@@ -19,6 +19,7 @@ jobs:
     if: github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && (github.head_ref == 'alec-desktop-redesign' || github.head_ref == 'alec-proactive-v7' || github.head_ref == 'alec-qr-v7.1'))
     runs-on: windows-latest
     timeout-minutes: 90
+    environment: ${{ github.event_name == 'push' && github.ref_name == 'alec-signed-updater' && vars.ALEC_UPDATER_PUBLIC_KEY != '' && 'alec-signing' || 'alec-candidate' }}
     env:
       ALEC_UPDATER_PUBLIC_KEY: ${{ github.event_name == 'push' && github.ref_name == 'alec-signed-updater' && vars.ALEC_UPDATER_PUBLIC_KEY || '' }}
     steps:
@@ -85,7 +86,11 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ github.event_name == 'push' && github.ref_name == 'alec-signed-updater' && secrets.ALEC_UPDATER_PRIVATE_KEY || '' }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ github.event_name == 'push' && github.ref_name == 'alec-signed-updater' && secrets.ALEC_UPDATER_PRIVATE_KEY_PASSWORD || '' }}
         run: |
-          if [ -n "$ALEC_UPDATER_PUBLIC_KEY" ] && [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then echo 'Signing key not provisioned'; exit 1; fi
+          if [ -n "$ALEC_UPDATER_PUBLIC_KEY" ]; then
+            if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ] || [ -z "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" ]; then echo 'Protected signing environment not provisioned'; exit 1; fi
+          else
+            unset TAURI_SIGNING_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+          fi
           ./build.sh release --target x86_64-pc-windows-msvc
       - name: Install and verify native helpers and runtime
         working-directory: upstream/showcase/tauri
@@ -188,10 +193,12 @@ jobs:
           }
           $out = Join-Path $env:GITHUB_WORKSPACE 'candidate'
           New-Item -ItemType Directory -Force $out | Out-Null
-          $dest = Join-Path $out 'ALEC-Desktop-0.2.0-Preview-x64-candidate-setup.exe'
+          $version = (Get-Content (Join-Path $env:GITHUB_WORKSPACE 'desktop-redesign/native/alec-version.json') -Raw | ConvertFrom-Json).version
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid ALEC version' }
+          $dest = Join-Path $out "ALEC-Desktop-$version-Preview-x64-setup.exe"
           Copy-Item $setup.FullName $dest
           $hash = (Get-FileHash $dest -Algorithm SHA256).Hash.ToLowerInvariant()
-          Set-Content (Join-Path $out 'SHA256.txt') "$hash  ALEC-Desktop-0.2.0-Preview-x64-candidate-setup.exe"
+          Set-Content (Join-Path $out 'SHA256.txt') "$hash  $(Split-Path $dest -Leaf)" -Encoding utf8NoBOM
           if ($env:ALEC_UPDATER_PUBLIC_KEY) {
             $sig = $setup.FullName + '.sig'
             if (-not (Test-Path $sig)) { throw 'Signed build missing detached signature' }
@@ -200,6 +207,10 @@ jobs:
             $manifest = @{ version=$version; notes='ALEC Preview'; pub_date=(Get-Date).ToUniversalTime().ToString('o'); platforms=@{'windows-x86_64'=@{signature=(Get-Content $sig -Raw).Trim();url=('https://github.com/Mula-Edmilson/alec-ola-alec-build/releases/download/v'+$version+'/'+(Split-Path $dest -Leaf))}} }
             $manifest | ConvertTo-Json -Depth 6 | Set-Content (Join-Path $out 'latest.json') -Encoding utf8NoBOM
           }
+      - name: Validate signed release package before upload
+        if: env.ALEC_UPDATER_PUBLIC_KEY != ''
+        shell: bash
+        run: node desktop-redesign/native/verify-alec-release.mjs candidate
       - name: Include corresponding source and license
         shell: bash
         run: |
@@ -215,7 +226,7 @@ jobs:
           git rev-parse HEAD >> candidate/SOURCE.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: ALEC-Desktop-0.2.0-Preview-Windows-x64-candidate
+          name: ALEC-Desktop-Preview-Windows-x64-candidate
           path: candidate/
           if-no-files-found: error
           retention-days: 30
