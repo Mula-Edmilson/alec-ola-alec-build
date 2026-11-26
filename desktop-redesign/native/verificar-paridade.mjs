@@ -30,6 +30,8 @@ const newAllowed=new Set(['showcase/tauri/sidecar/alec-qr-runtime.mjs','showcase
 newAllowed.add('showcase/tauri/sidecar/alec-sigma-vision.mjs');
 newAllowed.add('showcase/tauri/sidecar/alec-sigma-supervisor.mjs');
 newAllowed.add('showcase/tauri/sidecar/alec-update.mjs');
+newAllowed.add('showcase/tauri/sidecar/alec-trust.mjs');
+newAllowed.add('showcase/tauri/sidecar/alec-learn.mjs');
 for(const f of git('ls-files','--others','--exclude-standard').trim().split('\n').filter(Boolean))assert.ok(newAllowed.has(f),'Unexpected added source: '+f);
 const before=f=>git('show','HEAD:'+f).replace(/\r\n/g,'\n');
 const after=f=>readFileSync(path.join(root,f),'utf8').replace(/\r\n/g,'\n');
@@ -96,4 +98,6 @@ assert.ok(after(core+'alec-qr-runtime.mjs').includes("'/api/pair/qr'")&&after(co
 assert.ok(after(core+'alec-qrcode.cjs').includes('MIT License'),'QR dependency license retained');
 assert.ok(source.includes("if(l!=='jarvis')return;")&&source.includes("looks: LOOKS.filter(([id])=>id==='jarvis')"),'Only ALEC is selectable');
 assert.ok(after('showcase/onboarding/onboarding.js').includes("look.radios('looks', LOOKS.filter(([id])=>id==='jarvis'), 'jarvis'")&&after('showcase/onboarding/index.html').includes('Bem-vindo ao ALEC'),'ALEC first-run identity');
+for(const file of ['alec-trust.mjs','alec-learn.mjs'])assert.equal(after(core+file),readFileSync(new URL('./'+file,import.meta.url),'utf8').replace(/\r\n/g,'\n'),'Trust/Learn integrity');
+assert.ok(shell.includes('if window.label() != PANEL_LABEL { return; }')&&source.includes('m.alecLocalPanel!==true'),'Local panel approval boundary required');
 console.log('Parity source gate OK: '+protectedPaths.length+' original tracked paths protected; all native script references preserved. Runtime behavior still requires tests.');
