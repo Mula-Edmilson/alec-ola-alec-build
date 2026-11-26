@@ -66,7 +66,7 @@ const shell=after('showcase/tauri/src-tauri/src/main.rs');
 assert.ok(shell.includes('const PANEL_W: f64 = 400.0;')&&shell.includes('const PANEL_H: f64 = 470.0;')&&!shell.includes('fn alec_panel_compact('),'One compact window, no expanded alternative');
 assert.ok(shell.includes('.skip_taskbar(true)')&&shell.includes('hide_panel(&app2, "blur")'),'Popup closes on loss of focus');
 assert.ok(source.includes('if(!config.alecCursorV4){delete config.avatarPin;config.alecCursorV4=true;}')&&!source.includes("config.avatarPin={corner:'bottom-right'"),'Do not force pin on cursor-follow avatar');
-assert.ok(!source.includes("send({ type: 'update', install: false })")&&!source.includes("send({ type: 'update', install: true })")&&source.includes('await checkAlecRelease(VERSION,{channel:'),'Only ALEC release discovery may run');
+assert.ok(!source.includes("send({ type: 'update', install: false })")&&!source.includes("send({ type: 'update', install: true })")&&source.includes('await checkAlecRelease(VERSION)')&&!source.includes('alec_update_channel')&&!after('showcase/panel/panel.js').includes('Canal de actualizações'),'Only ALEC release discovery may run');
 assert.equal(after(core+'alec-update.mjs'),readFileSync(new URL('./alec-update.mjs',import.meta.url),'utf8').replace(/\r\n/g,'\n'),'ALEC update module integrity mismatch');
 assert.ok(after('showcase/panel/alec-theme.css').includes('.alec-bridge-check input[type=checkbox]'),'Remote checkbox layout fix required');
 assert.ok(panelSource.includes('Edmilson Mula')&&!panelSource.includes('Digital Reach Out')&&!after('showcase/panel/index.html').includes('By Ken Kai'),'Restore ALEC author only in About');
