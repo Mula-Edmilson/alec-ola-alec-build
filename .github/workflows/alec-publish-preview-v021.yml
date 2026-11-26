@@ -1,0 +1,64 @@
+name: ALEC Publish reviewed Preview 0.2.1
+on:
+  push:
+    branches: [alec-signed-updater]
+    paths: ['.github/workflows/alec-publish-preview-v021.yml']
+permissions:
+  actions: read
+  contents: write
+concurrency:
+  group: alec-publish-preview-v021
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.repository == 'Mula-Edmilson/alec-ola-alec-build'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EXPECTED_SHA: 0c17263f9a6615703d048169ac266e4628dcb3ae
+      RUN_ID: '45864425397'
+      ARTIFACT_ID: '15140861631'
+      TAG: v0.2.1
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: 0c17263f9a6615703d048169ac266e4628dcb3ae
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Verify exact reviewed signing run and artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run view "$RUN_ID" --json conclusion,headSha,headBranch --repo "$GITHUB_REPOSITORY" | jq -e --arg sha "$EXPECTED_SHA" '.conclusion=="success" and .headSha==$sha and .headBranch=="alec-signed-updater"'
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID" | jq -e --arg run "$RUN_ID" --arg sha "$EXPECTED_SHA" '.expired==false and .name=="ALEC-Desktop-Preview-Windows-x64-candidate" and (.workflow_run.id|tostring)==$run and .workflow_run.head_sha==$sha'
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name ALEC-Desktop-Preview-Windows-x64-candidate --dir candidate
+          node desktop-redesign/native/verify-alec-release.mjs candidate
+          test "$(tail -n 1 candidate/SOURCE.txt | tr -d '\r')" = "$EXPECTED_SHA"
+          test -s candidate/LICENSE
+          test -s candidate/ALEC-source.patch
+          test -d candidate/new-source
+          (cd candidate && zip -qr ALEC-corresponding-source.zip ALEC-source.patch new-source LICENSE SOURCE.txt BUILD-CANDIDATE.md)
+      - name: Publish immutable test prerelease from reviewed package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Never replace existing assets or move an existing tag.
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo 'Release already exists; refusing replacement'; exit 1; fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" >/dev/null 2>&1; then echo 'Tag already exists; refusing replacement'; exit 1; fi
+          cat > notes.md <<'EOF'
+          ## ALEC 0.2.1 Preview — teste de actualização nativa
+          Primeira actualização experimental a partir do ALEC 0.2.0 assinado.
+          - Compilação Windows x64, testes de regressão e verificação de consistência do pacote aprovados.
+          - Mesmo core e funcionalidades de 0.2.0; incremento de versão para testar descoberta, notificação, instalação assinada e reinício.
+          - No ALEC 0.2.0, selecciona Preview em Novidades, verifica actualizações e confirma a instalação.
+          **Limitações:** actualização entre versões ainda por validar num PC real, assim como persistência das configurações após reinício e recuperação manual. Rollback automático não implementado. Guarda uma cópia de segurança. Não é uma versão Stable. Assinatura Tauri não equivale a Authenticode.
+          EOF
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$EXPECTED_SHA" --title "ALEC 0.2.1 Preview" --notes-file notes.md --draft --prerelease --latest=false \
+            candidate/ALEC-Desktop-0.2.1-Preview-x64-setup.exe \
+            candidate/ALEC-Desktop-0.2.1-Preview-x64-setup.exe.sig \
+            candidate/latest.json candidate/SHA256.txt candidate/LICENSE candidate/ALEC-corresponding-source.zip
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest=false
