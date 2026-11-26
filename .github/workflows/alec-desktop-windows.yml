@@ -170,6 +170,16 @@ jobs:
             }
             if ($startup -ne $expectedStartup) { throw 'ALEC independent autostart was not registered to the installed EXE' }
             Write-Host 'ALEC independent autostart verified against installed executable.'
+            if ($env:GITHUB_REF_NAME -eq 'alec-signed-updater') {
+              $intro = $false
+              for ($i=0; $i -lt 45; $i++) {
+                if ($run.HasExited) { break }
+                if (Get-ChildItem $logs -Filter *.log -ErrorAction SilentlyContinue | Select-String -Pattern 'alec_intro_visible' -Quiet) { $intro=$true; break }
+                Start-Sleep -Seconds 1
+              }
+              if (-not $intro) { throw 'Installed ALEC overlay did not acknowledge its startup appearance' }
+              Write-Host 'ALEC startup Orb appearance acknowledged by the installed overlay.'
+            }
             Start-Process -FilePath $app.FullName -ArgumentList '--panel'
             $reportPath = Join-Path $data 'alec-native-visual-report.json'
             for ($i=0; $i -lt 100; $i++) {
