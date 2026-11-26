@@ -5,7 +5,7 @@ on:
     branches: [main]
     types: [opened, synchronize, reopened]
   push:
-    branches: [alec-desktop-redesign, alec-proactive-v7, alec-qr-v7.1, alec-qr-v7.2, alec-vision-v8]
+    branches: [alec-desktop-redesign, alec-proactive-v7, alec-qr-v7.1, alec-qr-v7.2, alec-vision-v8, alec-signed-updater]
     paths:
       - '.github/workflows/alec-desktop-windows.yml'
       - 'desktop-redesign/native/**'
@@ -41,6 +41,7 @@ jobs:
           node desktop-redesign/native/testar-voz-alec.mjs
           node desktop-redesign/native/testar-contexto-local.mjs
           node desktop-redesign/native/testar-qr.mjs
+          if [ "$GITHUB_REF_NAME" = "alec-signed-updater" ]; then node --test desktop-redesign/native/test-alec-update.mjs desktop-redesign/native/test-alec-trust.mjs desktop-redesign/native/test-alec-learn.mjs desktop-redesign/native/test-alec-cloud-evolution.mjs; fi
           if [ "$GITHUB_REF_NAME" = "alec-vision-v8" ]; then node --test desktop-redesign/native/test-alec-sigma-vision.mjs desktop-redesign/native/test-alec-sigma-supervisor.mjs; fi
       - name: Install locked sidecar dependencies
         working-directory: upstream/showcase/tauri/sidecar
@@ -181,10 +182,10 @@ jobs:
           }
           $out = Join-Path $env:GITHUB_WORKSPACE 'candidate'
           New-Item -ItemType Directory -Force $out | Out-Null
-          $dest = Join-Path $out 'ALEC-Desktop-0.1.51-Native-v8-x64-candidate-setup.exe'
+          $dest = Join-Path $out 'ALEC-Desktop-0.2.0-Preview-x64-candidate-setup.exe'
           Copy-Item $setup.FullName $dest
           $hash = (Get-FileHash $dest -Algorithm SHA256).Hash.ToLowerInvariant()
-          Set-Content (Join-Path $out 'SHA256.txt') "$hash  ALEC-Desktop-0.1.51-Native-v8-x64-candidate-setup.exe"
+          Set-Content (Join-Path $out 'SHA256.txt') "$hash  ALEC-Desktop-0.2.0-Preview-x64-candidate-setup.exe"
       - name: Include corresponding source and license
         shell: bash
         run: |
