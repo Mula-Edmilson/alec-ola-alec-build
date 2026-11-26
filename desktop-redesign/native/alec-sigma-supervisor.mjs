@@ -29,8 +29,10 @@ function dpapi(mode,input){
   return new Promise((resolve,reject)=>{
     const sys=process.env.SystemRoot;if(!sys)return reject(Error('Windows DPAPI indisponível.'));
     const exe=path.join(sys,'System32','WindowsPowerShell','v1.0','powershell.exe');
-    const commands={protect:"$ErrorActionPreference='Stop'; $v=[Console]::In.ReadToEnd(); ConvertTo-SecureString $v -AsPlainText -Force | ConvertFrom-SecureString",unprotect:"$ErrorActionPreference='Stop'; $v=[Console]::In.ReadToEnd(); $s=ConvertTo-SecureString $v; $p=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($s); try {[Runtime.InteropServices.Marshal]::PtrToStringBSTR($p)} finally {[Runtime.InteropServices.Marshal]::ZeroFreeBSTR($p)}"};
-    const child=spawn(exe,['-NoProfile','-NonInteractive','-Command',commands[mode]],{windowsHide:true,stdio:['pipe','pipe','ignore'],shell:false});
+    // PowerShell expands $variables when Node passes a quoted -Command on some Windows hosts.
+    // EncodedCommand preserves the script verbatim; credentials still travel only through stdin.
+    const commands={protect:"$ErrorActionPreference='Stop'; $v=[Console]::In.ReadToEnd(); $s=ConvertTo-SecureString -String $v -AsPlainText -Force; ConvertFrom-SecureString -SecureString $s",unprotect:"$ErrorActionPreference='Stop'; $v=[Console]::In.ReadToEnd(); $s=ConvertTo-SecureString -String $v; $p=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($s); try {[Runtime.InteropServices.Marshal]::PtrToStringBSTR($p)} finally {[Runtime.InteropServices.Marshal]::ZeroFreeBSTR($p)}"};
+    const child=spawn(exe,['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(commands[mode],'utf16le').toString('base64')],{windowsHide:true,stdio:['pipe','pipe','ignore'],shell:false});
     let out='',done=false;const finish=(err,val)=>{if(done)return;done=true;clearTimeout(timer);err?reject(err):resolve(val);};
     const timer=setTimeout(()=>{child.kill();finish(Error('Windows DPAPI não respondeu.'));},10000);
     child.stdout.setEncoding('utf8');child.stdout.on('data',s=>{out+=s;if(out.length>16384){child.kill();finish(Error('Resposta DPAPI inválida.'));}});
