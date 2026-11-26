@@ -20,7 +20,7 @@ jobs:
         with:
           node-version: 24
       - name: Vision unit tests
-        run: node --test desktop-redesign/native/test-alec-sigma-vision.mjs
+        run: node --test desktop-redesign/native/test-alec-sigma-vision.mjs desktop-redesign/native/test-alec-sigma-supervisor.mjs
       - name: Check upstream source preparation
         shell: bash
         run: |

@@ -576,18 +576,24 @@ function panel() {`);
   out['showcase/panel/alec-theme.css']+="\n/* V7.1: private QR, high contrast and a quiet zone for reliable cameras. */\n.alec-qr-canvas{display:block;max-width:100%;height:auto;width:min(100%,205px);image-rendering:pixelated;margin:10px auto;border-radius:5px;background:#fff}.alec-pair-legacy{margin-top:8px;font-size:11px;color:#a8b7d0}.alec-pair-legacy summary{cursor:pointer}.alec-pair{overflow-wrap:anywhere}\n";
   // ALEC Vision: optional Sigma provider, with no change to the existing Remote bridge.
   out['showcase/tauri/sidecar/alec-sigma-vision.mjs']=fs.readFileSync(new URL('./alec-sigma-vision.mjs',import.meta.url),'utf8');
-  rep(sc,"import { z } from 'zod';","import { z } from 'zod';\nimport { createSigmaVision, sigmaTools, SIGMA_TOOL_NAMES } from './alec-sigma-vision.mjs';");
+  out['showcase/tauri/sidecar/alec-sigma-supervisor.mjs']=fs.readFileSync(new URL('./alec-sigma-supervisor.mjs',import.meta.url),'utf8');
+  rep(sc,"import { z } from 'zod';","import { z } from 'zod';\nimport { createSigmaVision, sigmaTools, SIGMA_TOOL_NAMES } from './alec-sigma-vision.mjs';\nimport { createSigmaSupervisor, approveSigmaSettings } from './alec-sigma-supervisor.mjs';");
   rep(sc,"// The app's own manual, read when they ask about Roamies rather than sent with every request.",[
-    "const alecSigma=createSigmaVision({enabled:()=>config.alecSigmaEnabled===true,remote:()=>!!alecContext.getStore()||!!alecCurrent,checkPath:p=>path.isAbsolute(p)&&checkRead(p,HOME).level===SAFE});",
+    "const sigmaRootAllowed=p=>path.isAbsolute(p)&&checkRead(p,HOME,{recursive:true}).level===SAFE;",
+    "const sigmaSupervisor=createSigmaSupervisor({settings:()=>config.alecSigmaSettings,enabled:()=>config.alecSigmaEnabled===true,checkRoot:sigmaRootAllowed,folder:process.env.LOCALAPPDATA?path.join(process.env.LOCALAPPDATA,'ALEC','vision'):null,onChange:()=>panel()});",
+    "const alecSigma=createSigmaVision({enabled:()=>config.alecSigmaEnabled===true,remote:()=>!!alecContext.getStore()||!!alecCurrent,checkPath:p=>path.isAbsolute(p)&&checkRead(p,HOME).level===SAFE&&sigmaSupervisor.allows(p),configured:sigmaSupervisor.configured,getToken:sigmaSupervisor.getToken,ensureReady:sigmaSupervisor.ensure});",
     "tools.push(...sigmaTools(z,alecSigma));",
     "// The app's own manual, read when they ask about Roamies rather than sent with every request."
   ].join('\n'));
   rep(sc,"tools: textChat ? [] : config.lite ? tools.filter((t) => LITE_TOOLS.has(t.name)) : tools,","tools: textChat ? [] : tools.filter(t=>(!config.lite||LITE_TOOLS.has(t.name))&&(!SIGMA_TOOL_NAMES.has(t.name)||alecSigma.available())),");
-  rep(sc,"alecManagedBridge: { ...alecBridge.snapshot(), connecting:","alecSigma: alecSigma.snapshot(), alecManagedBridge: { ...alecBridge.snapshot(), connecting:");
+  rep(sc,"alecManagedBridge: { ...alecBridge.snapshot(), connecting:","alecSigma: {...alecSigma.snapshot(), supervisor:sigmaSupervisor.snapshot()}, alecManagedBridge: { ...alecBridge.snapshot(), connecting:");
   rep(sc,"} else if(m.type==='alec_bridge_qr_renew'){",[
     "} else if(m.type==='alec_sigma_toggle'){",
     "    if(typeof m.enabled!=='boolean'||busy)return;",
-    "    config.alecSigmaEnabled=m.enabled;alecSigma.reset();agent=null;saveConfig();panel();",
+    "    config.alecSigmaEnabled=m.enabled;alecSigma.reset();sigmaSupervisor.reset();agent=null;saveConfig();panel();",
+    "  } else if(m.type==='alec_sigma_configure'){",
+    "    if(busy||queued)return;",
+    "    void approveSigmaSettings(m.settings,sigmaRootAllowed).then(settings=>{if(busy||queued)throw Error('Termina a tarefa em curso.');config.alecSigmaEnabled=false;config.alecSigmaSettings=settings;sigmaSupervisor.reset();alecSigma.reset();agent=null;saveConfig();panelNote('Configuração Sigma aprovada. Activa a integração para utilizar.');}).catch(e=>panelNote(String(e.message).slice(0,250),true)).finally(()=>panel());",
     "  } else if(m.type==='alec_sigma_test'){",
     "    if(busy)return;",
     "    void alecSigma.status().then(()=>panelNote('Sigma respondeu ao teste local.')).catch(e=>panelNote(String(e.message).slice(0,250),true)).finally(()=>panel());",
@@ -595,10 +601,14 @@ function panel() {`);
   ].join('\n'));
   rep(pj,"  function alecVisionPage(){\n    return [alecPageTitle('Visão','Capturas, análise e marcações no ecrã.'),",[
     "  function alecVisionPage(){",
-    "    const sigma=state.alecSigma||{};",
-    "    const sigmaLabel=!sigma.enabled?'Desactivado':!sigma.configured?'Credencial local em falta':sigma.state==='connected'?(sigma.indexReady?'Índice pronto':sigma.scanning?'A indexar':'Índice ainda não pronto'):sigma.state==='unavailable'?'Sem ligação':'Ligação por testar';",
+    "    const sigma=state.alecSigma||{}, sup=sigma.supervisor||{}, settings=sup.settings||{};",
+    "    const exe=el('input',{type:'text',value:settings.exe||'',placeholder:'C:\\\\...\\\\sigma-file-manager.exe','aria-label':'Executável Sigma',disabled:!!state.busy});",
+    "    const roots=el('textarea',{rows:3,placeholder:'Uma pasta autorizada por linha',value:(settings.roots||[]).join('\\n'),'aria-label':'Pastas autorizadas',disabled:!!state.busy});",
+    "    const monitor=el('input',{type:'checkbox',checked:settings.monitor===true});",
+    "    const configure=()=>{if(confirm('Aprovar este executável e estas pastas para pesquisa local? A configuração desactiva a ligação anterior.'))send({type:'alec_sigma_configure',settings:{exe:exe.value.trim(),roots:roots.value.split(/\\r?\\n/).map(s=>s.trim()).filter(Boolean),monitor:monitor.checked}});};",
+    "    const sigmaLabel=!sigma.enabled?'Desactivado':!sigma.configured?'Configuração em falta':sigma.state==='connected'?(sigma.indexReady?'Índice pronto':sigma.scanning?'A indexar':'Índice ainda não pronto'):sigma.state==='unavailable'?'Sem ligação':'Ligação por testar';",
     "    return [alecPageTitle('Visão','Capturas, análise do ecrã e pesquisa de ficheiros.'),",
-    "      el('div',{className:'alec-pair'},el('strong',{textContent:'ALEC Vision · Sigma File Manager'}),el('p',{textContent:sigmaLabel}),el('p',{className:'alec-quiet',textContent:'Pesquisa local de nomes e pastas autorizadas. Apenas metadados; sem leitura de conteúdo, escrita ou acesso Remote.'}),el('div',{className:'row-btns'},btn(sigma.enabled?'Desactivar':'Activar',()=>send({type:'alec_sigma_toggle',enabled:!sigma.enabled}),{disabled:!!state.busy,k:'alec-sigma-toggle'}),btn('Testar ligação',()=>send({type:'alec_sigma_test'}),{disabled:!sigma.enabled||!sigma.configured||!!state.busy,k:'alec-sigma-test'}))),"
+    "      el('div',{className:'alec-pair'},el('strong',{textContent:'ALEC Vision · Sigma File Manager'}),el('p',{textContent:sigmaLabel}),el('p',{className:'alec-quiet',textContent:'Executável Sigma modificado e pastas autorizadas. Apenas metadados; sem acesso Remote.'}),exe,roots,el('label',{},monitor,' Monitorizar alterações locais (sem IA)'),btn('Aprovar configuração',configure,{disabled:!!state.busy,k:'alec-sigma-configure'}),el('p',{className:'alec-quiet',textContent:'Supervisor: '+(sup.phase||'idle')+' · Alterações locais: '+(sup.changes||0)}),el('div',{className:'row-btns'},btn(sigma.enabled?'Desactivar':'Activar',()=>send({type:'alec_sigma_toggle',enabled:!sigma.enabled}),{disabled:!!state.busy,k:'alec-sigma-toggle'}),btn('Testar ligação',()=>send({type:'alec_sigma_test'}),{disabled:!sigma.enabled||!sigma.configured||!!state.busy,k:'alec-sigma-test'}))),"
   ].join('\n'));
   return {out,changes};
 }

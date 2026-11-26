@@ -29,7 +29,7 @@ async fn handle(State(state): State<Bridge>, headers: HeaderMap, Json(req): Json
     if !(1..=100).contains(&limit) { return error(StatusCode::BAD_REQUEST,"Invalid limit"); }
     match req.operation.as_str() {
         "status" => match global_search::global_search_get_status() {
-            Ok(s) => ok(json!({"indexReady":s.is_index_valid,"scanning":s.is_scan_in_progress})),
+            Ok(s) => ok(json!({"indexReady":s.is_index_valid,"scanning":s.is_scan_in_progress,"protocol":1,"roots":state.roots.iter().map(|p|p.to_string_lossy()).collect::<Vec<_>>()})),
             Err(_) => error(StatusCode::SERVICE_UNAVAILABLE,"Search index unavailable"),
         },
         "search" => {

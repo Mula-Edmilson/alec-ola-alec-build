@@ -26,8 +26,8 @@ export function createSigmaClient({token,fetchImpl=globalThis.fetch,timeout=1000
     list:(path,limit=30)=>{if(typeof path!=='string'||!path.trim()||path.length>4096||path.includes('\0'))throw Error('Caminho inválido.');return request('list',{path,limit:limits(limit)});}
   });
 }
-export function createSigmaVision({enabled,remote,checkPath,getToken=()=>process.env.ALEC_SIGMA_TOKEN,fetchImpl=globalThis.fetch}){
-  const configured=()=>validToken(getToken());
+export function createSigmaVision({enabled,remote,checkPath,getToken=()=>process.env.ALEC_SIGMA_TOKEN,fetchImpl=globalThis.fetch,configured:configuredOverride,ensureReady=async()=>{}}){
+  const configured=configuredOverride||(()=>validToken(getToken()));
   const available=()=>enabled()===true && configured() && !remote();
   let last={state:'untested',indexReady:false,scanning:false};
   function requireLocal(){if(!available())throw Error('ALEC Vision/Sigma não autorizado nesta sessão local.');}
@@ -41,13 +41,13 @@ export function createSigmaVision({enabled,remote,checkPath,getToken=()=>process
       modifiedTime:Number.isFinite(item.modifiedTime)?item.modifiedTime:null
     }));
   }
-  async function status(){requireLocal();try{const s=await client().status();requireLocal();last={state:'connected',indexReady:s.indexReady===true,scanning:s.scanning===true};return {...last};}catch(e){last={state:'unavailable',indexReady:false,scanning:false};throw e;}}
+  async function status(){requireLocal();try{await ensureReady();requireLocal();const s=await client().status();requireLocal();last={state:'connected',indexReady:s.indexReady===true,scanning:s.scanning===true};return {...last};}catch(e){last={state:'unavailable',indexReady:false,scanning:false};throw e;}}
   return {
     available, snapshot:()=>({enabled:enabled()===true,configured:configured(),...last}),
     reset:()=>{last={state:'untested',indexReady:false,scanning:false};},
     status,
-    async search(query,limit=30){requireLocal();limits(limit);const d=await client().search(query,limit);requireLocal();return {items:items(d,limit),exhaustive:false,scopeFiltered:true};},
-    async list(path,limit=30){requireLocal();limits(limit);if(!allowed(path))throw Error('Caminho não autorizado.');const d=await client().list(path,limit);requireLocal();return {items:items(d,limit),truncated:d.truncated===true,scopeFiltered:true};}
+    async search(query,limit=30){requireLocal();limits(limit);await ensureReady();requireLocal();const d=await client().search(query,limit);requireLocal();return {items:items(d,limit),exhaustive:false,scopeFiltered:true};},
+    async list(path,limit=30){requireLocal();limits(limit);if(!allowed(path))throw Error('Caminho não autorizado.');await ensureReady();requireLocal();const d=await client().list(path,limit);requireLocal();return {items:items(d,limit),truncated:d.truncated===true,scopeFiltered:true};}
   };
 }
 export function sigmaTools(z,vision){

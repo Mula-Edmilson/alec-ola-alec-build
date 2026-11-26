@@ -5,7 +5,7 @@ on:
     branches: [main]
     types: [opened, synchronize, reopened]
   push:
-    branches: [alec-desktop-redesign, alec-proactive-v7, alec-qr-v7.1, alec-qr-v7.2]
+    branches: [alec-desktop-redesign, alec-proactive-v7, alec-qr-v7.1, alec-qr-v7.2, alec-vision-v8]
     paths:
       - '.github/workflows/alec-desktop-windows.yml'
       - 'desktop-redesign/native/**'
@@ -41,6 +41,7 @@ jobs:
           node desktop-redesign/native/testar-voz-alec.mjs
           node desktop-redesign/native/testar-contexto-local.mjs
           node desktop-redesign/native/testar-qr.mjs
+          if [ "$GITHUB_REF_NAME" = "alec-vision-v8" ]; then node --test desktop-redesign/native/test-alec-sigma-vision.mjs desktop-redesign/native/test-alec-sigma-supervisor.mjs; fi
       - name: Install locked sidecar dependencies
         working-directory: upstream/showcase/tauri/sidecar
         shell: bash
@@ -180,16 +181,16 @@ jobs:
           }
           $out = Join-Path $env:GITHUB_WORKSPACE 'candidate'
           New-Item -ItemType Directory -Force $out | Out-Null
-          $dest = Join-Path $out 'ALEC-Desktop-0.1.51-Native-v7.1-x64-candidate-setup.exe'
+          $dest = Join-Path $out 'ALEC-Desktop-0.1.51-Native-v8-x64-candidate-setup.exe'
           Copy-Item $setup.FullName $dest
           $hash = (Get-FileHash $dest -Algorithm SHA256).Hash.ToLowerInvariant()
-          Set-Content (Join-Path $out 'SHA256.txt') "$hash  ALEC-Desktop-0.1.51-Native-v7.1-x64-candidate-setup.exe"
+          Set-Content (Join-Path $out 'SHA256.txt') "$hash  ALEC-Desktop-0.1.51-Native-v8-x64-candidate-setup.exe"
       - name: Include corresponding source and license
         shell: bash
         run: |
           git -C upstream diff --binary HEAD > candidate/ALEC-source.patch
           mkdir -p candidate/new-source
-          git -C upstream ls-files --others --exclude-standard -- showcase/tauri/sidecar/alec-qr-runtime.mjs showcase/tauri/sidecar/alec-qrcode.cjs showcase/tauri/sidecar/alec-local-context.mjs showcase/tauri/sidecar/alec-voice-preference.mjs showcase/tauri/sidecar/alec-legacy-profile.mjs showcase/tauri/sidecar/alec-skill-hub.mjs showcase/tauri/sidecar/alec-bridge-supervisor.mjs showcase/panel/alec-theme.css showcase/tauri/sidecar/alec-wake-phrase.mjs showcase/tauri/sidecar/test/alec-wake-phrase.test.mjs | while IFS= read -r f; do
+          git -C upstream ls-files --others --exclude-standard -- showcase/tauri/sidecar/alec-qr-runtime.mjs showcase/tauri/sidecar/alec-qrcode.cjs showcase/tauri/sidecar/alec-local-context.mjs showcase/tauri/sidecar/alec-voice-preference.mjs showcase/tauri/sidecar/alec-legacy-profile.mjs showcase/tauri/sidecar/alec-skill-hub.mjs showcase/tauri/sidecar/alec-bridge-supervisor.mjs showcase/panel/alec-theme.css showcase/tauri/sidecar/alec-wake-phrase.mjs showcase/tauri/sidecar/test/alec-wake-phrase.test.mjs showcase/tauri/sidecar/alec-sigma-vision.mjs showcase/tauri/sidecar/alec-sigma-supervisor.mjs | while IFS= read -r f; do
             mkdir -p "candidate/new-source/$(dirname "$f")"
             cp "upstream/$f" "candidate/new-source/$f"
           done
@@ -199,7 +200,7 @@ jobs:
           git rev-parse HEAD >> candidate/SOURCE.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: ALEC-Desktop-Native-v7.1-Windows-x64-candidate
+          name: ALEC-Desktop-Native-v8-Windows-x64-candidate
           path: candidate/
           if-no-files-found: error
           retention-days: 30

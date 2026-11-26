@@ -28,6 +28,7 @@ for(const line of git('diff','--name-status','HEAD').trim().split('\n').filter(B
 }
 const newAllowed=new Set(['showcase/tauri/sidecar/alec-qr-runtime.mjs','showcase/tauri/sidecar/alec-qrcode.cjs','showcase/tauri/sidecar/alec-local-context.mjs','showcase/tauri/sidecar/alec-voice-preference.mjs','showcase/panel/alec-theme.css','showcase/tauri/sidecar/alec-bridge-supervisor.mjs','showcase/tauri/sidecar/alec-skill-hub.mjs','showcase/tauri/sidecar/alec-legacy-profile.mjs','showcase/tauri/sidecar/alec-wake-phrase.mjs','showcase/tauri/sidecar/test/alec-wake-phrase.test.mjs']);
 newAllowed.add('showcase/tauri/sidecar/alec-sigma-vision.mjs');
+newAllowed.add('showcase/tauri/sidecar/alec-sigma-supervisor.mjs');
 for(const f of git('ls-files','--others','--exclude-standard').trim().split('\n').filter(Boolean))assert.ok(newAllowed.has(f),'Unexpected added source: '+f);
 const before=f=>git('show','HEAD:'+f).replace(/\r\n/g,'\n');
 const after=f=>readFileSync(path.join(root,f),'utf8').replace(/\r\n/g,'\n');
