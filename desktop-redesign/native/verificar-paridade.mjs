@@ -29,6 +29,7 @@ for(const line of git('diff','--name-status','HEAD').trim().split('\n').filter(B
 const newAllowed=new Set(['showcase/tauri/sidecar/alec-qr-runtime.mjs','showcase/tauri/sidecar/alec-qrcode.cjs','showcase/tauri/sidecar/alec-local-context.mjs','showcase/tauri/sidecar/alec-voice-preference.mjs','showcase/panel/alec-theme.css','showcase/tauri/sidecar/alec-bridge-supervisor.mjs','showcase/tauri/sidecar/alec-skill-hub.mjs','showcase/tauri/sidecar/alec-legacy-profile.mjs','showcase/tauri/sidecar/alec-wake-phrase.mjs','showcase/tauri/sidecar/test/alec-wake-phrase.test.mjs']);
 newAllowed.add('showcase/tauri/sidecar/alec-sigma-vision.mjs');
 newAllowed.add('showcase/tauri/sidecar/alec-sigma-supervisor.mjs');
+newAllowed.add('showcase/tauri/sidecar/alec-update.mjs');
 for(const f of git('ls-files','--others','--exclude-standard').trim().split('\n').filter(Boolean))assert.ok(newAllowed.has(f),'Unexpected added source: '+f);
 const before=f=>git('show','HEAD:'+f).replace(/\r\n/g,'\n');
 const after=f=>readFileSync(path.join(root,f),'utf8').replace(/\r\n/g,'\n');
@@ -62,7 +63,8 @@ const shell=after('showcase/tauri/src-tauri/src/main.rs');
 assert.ok(shell.includes('const PANEL_W: f64 = 400.0;')&&shell.includes('const PANEL_H: f64 = 470.0;')&&!shell.includes('fn alec_panel_compact('),'One compact window, no expanded alternative');
 assert.ok(shell.includes('.skip_taskbar(true)')&&shell.includes('hide_panel(&app2, "blur")'),'Popup closes on loss of focus');
 assert.ok(source.includes('if(!config.alecCursorV4){delete config.avatarPin;config.alecCursorV4=true;}')&&!source.includes("config.avatarPin={corner:'bottom-right'"),'Do not force pin on cursor-follow avatar');
-assert.ok(!source.includes('setTimeout(() => checkUpdates(), 20_000)')&&!source.includes("send({ type: 'update', install: false })"),'Do not query incompatible updater');
+assert.ok(!source.includes("send({ type: 'update', install: false })")&&!source.includes("send({ type: 'update', install: true })")&&source.includes('await checkAlecRelease(VERSION)'),'Only ALEC release discovery may run');
+assert.equal(after(core+'alec-update.mjs'),readFileSync(new URL('./alec-update.mjs',import.meta.url),'utf8').replace(/\r\n/g,'\n'),'ALEC update module integrity mismatch');
 assert.ok(after('showcase/panel/alec-theme.css').includes('.alec-bridge-check input[type=checkbox]'),'Remote checkbox layout fix required');
 assert.ok(panelSource.includes('Edmilson Mula')&&!panelSource.includes('Digital Reach Out')&&!after('showcase/panel/index.html').includes('By Ken Kai'),'Restore ALEC author only in About');
 assert.ok(shell.includes('KEY, "/v", "ALEC"')&&!shell.includes('KEY, "/v", "Roamies"'),'Independent Windows startup registration');
