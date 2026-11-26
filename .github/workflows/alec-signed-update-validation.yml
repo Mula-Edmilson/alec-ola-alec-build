@@ -20,7 +20,7 @@ jobs:
         with:
           node-version: 24
       - name: Policy, Learn and Update unit tests
-        run: node --test desktop-redesign/native/test-alec-trust.mjs desktop-redesign/native/test-alec-learn.mjs desktop-redesign/native/test-alec-update.mjs desktop-redesign/native/test-alec-cloud-evolution.mjs
+        run: node --test desktop-redesign/native/test-alec-trust.mjs desktop-redesign/native/test-alec-learn.mjs desktop-redesign/native/test-alec-update.mjs desktop-redesign/native/test-alec-cloud-evolution.mjs desktop-redesign/native/test-verify-alec-release.mjs
       - name: Validate desktop integration
         shell: bash
         run: |
