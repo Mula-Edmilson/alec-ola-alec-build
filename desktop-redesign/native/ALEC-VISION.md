@@ -1,6 +1,6 @@
 # ALEC Vision — Sigma (V8 experimental)
 
-Base: ALEC V7.2. The Sigma service is the independent GPL bridge from the earlier ALEC Vision prototype; it must be patched/compiled separately against the documented Sigma 2.3.0 commit. Stock Sigma does not expose this API. This branch adds Desktop-side tool registration and a Visão panel, not a new Windows installer.
+Base: ALEC V7.2. The Sigma service is the independent GPL bridge in `sigma-integration/`; it must be patched/compiled separately against the documented Sigma 2.3.0 commit. Stock Sigma does not expose this API. This branch adds Desktop-side tool registration and a Visão panel, not a new Windows installer.
 
 - Start the modified Sigma and ALEC from the same local development session with a random 32-byte hex ALEC_SIGMA_TOKEN; configure ALEC_SIGMA_ENABLE=1 and ALEC_SIGMA_ROOTS on Sigma only. Do not expose port 47821 to the LAN or Tailscale. Never commit the token.
 - Visão > ALEC Vision · Sigma File Manager > Activar > Testar ligação. With a tool-capable non-lite model, ask ALEC to find a filename or list an authorised folder. Disabled by default. Existing ALEC read-safety checks additionally filter Sigma paths. The index must already exist.

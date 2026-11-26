@@ -1,0 +1,65 @@
+name: ALEC Vision validation
+on:
+  workflow_dispatch:
+  push:
+    branches: [alec-vision-v8]
+permissions:
+  contents: read
+concurrency:
+  group: alec-vision-v8
+  cancel-in-progress: true
+jobs:
+  desktop:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Vision unit tests
+        run: node --test desktop-redesign/native/test-alec-sigma-vision.mjs
+      - name: Check upstream source preparation
+        shell: bash
+        run: |
+          git clone --branch v0.1.51 --depth 1 https://github.com/KenKaiii/Roamies.git upstream
+          node desktop-redesign/native/preparar-fonte.mjs upstream --public
+          node desktop-redesign/native/verificar-paridade.mjs upstream
+          node desktop-redesign/native/testar-qr.mjs
+          node desktop-redesign/native/testar-voz-alec.mjs
+          node desktop-redesign/native/testar-contexto-local.mjs
+      - name: Install sidecar dependencies
+        working-directory: upstream/showcase/tauri/sidecar
+        run: npm ci
+      - name: Full sidecar regressions
+        run: node desktop-redesign/native/executar-testes.mjs upstream/showcase/tauri/sidecar/test
+  sigma:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v5
+        with:
+          repository: aleksey-hoffman/sigma-file-manager
+          ref: d0da797fa1ded2f8601d0e065329da06b43971e9
+          path: sigma-upstream
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply bridge and verify idempotence
+        run: |
+          python sigma-integration/apply_patch.py sigma-upstream
+          python sigma-integration/apply_patch.py sigma-upstream
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: sigma-upstream/src-tauri
+      - name: Check Sigma Windows Rust library
+        run: cargo check --manifest-path sigma-upstream/src-tauri/Cargo.toml --locked --release --lib
+      - name: Bridge security unit tests
+        run: cargo test --manifest-path sigma-upstream/src-tauri/Cargo.toml --locked --lib alec_file_bridge::tests
