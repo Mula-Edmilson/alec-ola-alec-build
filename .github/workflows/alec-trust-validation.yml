@@ -19,5 +19,5 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-      - name: Policy and update unit tests
-        run: node --test desktop-redesign/native/test-alec-trust.mjs desktop-redesign/native/test-alec-update.mjs
+      - name: Policy, Learn and Update unit tests
+        run: node --test desktop-redesign/native/test-alec-trust.mjs desktop-redesign/native/test-alec-learn.mjs desktop-redesign/native/test-alec-update.mjs
