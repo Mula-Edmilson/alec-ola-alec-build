@@ -19,6 +19,8 @@ jobs:
     if: github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && (github.head_ref == 'alec-desktop-redesign' || github.head_ref == 'alec-proactive-v7' || github.head_ref == 'alec-qr-v7.1'))
     runs-on: windows-latest
     timeout-minutes: 90
+    env:
+      ALEC_UPDATER_PUBLIC_KEY: ${{ github.event_name == 'push' && github.ref_name == 'alec-signed-updater' && vars.ALEC_UPDATER_PUBLIC_KEY || '' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -80,7 +82,11 @@ jobs:
         shell: bash
         env:
           TAURI_BUNDLES: nsis
-        run: ./build.sh release --target x86_64-pc-windows-msvc
+          TAURI_SIGNING_PRIVATE_KEY: ${{ github.event_name == 'push' && github.ref_name == 'alec-signed-updater' && secrets.ALEC_UPDATER_PRIVATE_KEY || '' }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ github.event_name == 'push' && github.ref_name == 'alec-signed-updater' && secrets.ALEC_UPDATER_PRIVATE_KEY_PASSWORD || '' }}
+        run: |
+          if [ -n "$ALEC_UPDATER_PUBLIC_KEY" ] && [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then echo 'Signing key not provisioned'; exit 1; fi
+          ./build.sh release --target x86_64-pc-windows-msvc
       - name: Install and verify native helpers and runtime
         working-directory: upstream/showcase/tauri
         shell: pwsh
@@ -186,12 +192,20 @@ jobs:
           Copy-Item $setup.FullName $dest
           $hash = (Get-FileHash $dest -Algorithm SHA256).Hash.ToLowerInvariant()
           Set-Content (Join-Path $out 'SHA256.txt') "$hash  ALEC-Desktop-0.2.0-Preview-x64-candidate-setup.exe"
+          if ($env:ALEC_UPDATER_PUBLIC_KEY) {
+            $sig = $setup.FullName + '.sig'
+            if (-not (Test-Path $sig)) { throw 'Signed build missing detached signature' }
+            Copy-Item $sig ($dest + '.sig')
+            $version = (Get-Content (Join-Path $env:GITHUB_WORKSPACE 'desktop-redesign/native/alec-version.json') -Raw | ConvertFrom-Json).version
+            $manifest = @{ version=$version; notes='ALEC Preview'; pub_date=(Get-Date).ToUniversalTime().ToString('o'); platforms=@{'windows-x86_64'=@{signature=(Get-Content $sig -Raw).Trim();url=('https://github.com/Mula-Edmilson/alec-ola-alec-build/releases/download/v'+$version+'/'+(Split-Path $dest -Leaf))}} }
+            $manifest | ConvertTo-Json -Depth 6 | Set-Content (Join-Path $out 'latest.json') -Encoding utf8NoBOM
+          }
       - name: Include corresponding source and license
         shell: bash
         run: |
           git -C upstream diff --binary HEAD > candidate/ALEC-source.patch
           mkdir -p candidate/new-source
-          git -C upstream ls-files --others --exclude-standard -- showcase/tauri/sidecar/alec-qr-runtime.mjs showcase/tauri/sidecar/alec-qrcode.cjs showcase/tauri/sidecar/alec-local-context.mjs showcase/tauri/sidecar/alec-voice-preference.mjs showcase/tauri/sidecar/alec-legacy-profile.mjs showcase/tauri/sidecar/alec-skill-hub.mjs showcase/tauri/sidecar/alec-bridge-supervisor.mjs showcase/panel/alec-theme.css showcase/tauri/sidecar/alec-wake-phrase.mjs showcase/tauri/sidecar/test/alec-wake-phrase.test.mjs showcase/tauri/sidecar/alec-sigma-vision.mjs showcase/tauri/sidecar/alec-sigma-supervisor.mjs | while IFS= read -r f; do
+          git -C upstream ls-files --others --exclude-standard -- showcase/tauri/sidecar/alec-qr-runtime.mjs showcase/tauri/sidecar/alec-qrcode.cjs showcase/tauri/sidecar/alec-local-context.mjs showcase/tauri/sidecar/alec-voice-preference.mjs showcase/tauri/sidecar/alec-legacy-profile.mjs showcase/tauri/sidecar/alec-skill-hub.mjs showcase/tauri/sidecar/alec-bridge-supervisor.mjs showcase/panel/alec-theme.css showcase/tauri/sidecar/alec-wake-phrase.mjs showcase/tauri/sidecar/test/alec-wake-phrase.test.mjs showcase/tauri/sidecar/alec-sigma-vision.mjs showcase/tauri/sidecar/alec-sigma-supervisor.mjs showcase/tauri/sidecar/alec-update.mjs showcase/tauri/sidecar/alec-trust.mjs showcase/tauri/sidecar/alec-learn.mjs showcase/tauri/sidecar/alec-cloud.mjs showcase/tauri/sidecar/alec-cloud-local.mjs showcase/tauri/sidecar/alec-evolution.mjs | while IFS= read -r f; do
             mkdir -p "candidate/new-source/$(dirname "$f")"
             cp "upstream/$f" "candidate/new-source/$f"
           done
@@ -201,7 +215,7 @@ jobs:
           git rev-parse HEAD >> candidate/SOURCE.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: ALEC-Desktop-Native-v8-Windows-x64-candidate
+          name: ALEC-Desktop-0.2.0-Preview-Windows-x64-candidate
           path: candidate/
           if-no-files-found: error
           retention-days: 30
