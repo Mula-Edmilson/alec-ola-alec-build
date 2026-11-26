@@ -1,0 +1,23 @@
+name: ALEC Trust validation
+on:
+  workflow_dispatch:
+  push:
+    branches: [alec-trust-engine]
+permissions:
+  contents: read
+concurrency:
+  group: alec-trust-validation
+  cancel-in-progress: true
+jobs:
+  policy:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Policy and update unit tests
+        run: node --test desktop-redesign/native/test-alec-trust.mjs desktop-redesign/native/test-alec-update.mjs
