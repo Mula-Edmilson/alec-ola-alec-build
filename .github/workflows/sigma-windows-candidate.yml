@@ -1,0 +1,65 @@
+name: Sigma Windows candidate
+on:
+  workflow_dispatch:
+  push:
+    branches: [alec-vision-v8]
+    paths:
+      - 'sigma-integration/**'
+      - 'desktop-redesign/native/alec-sigma-*.mjs'
+      - 'desktop-redesign/native/testar-sigma-real.mjs'
+      - '.github/workflows/sigma-windows-candidate.yml'
+permissions:
+  contents: read
+concurrency:
+  group: sigma-windows-candidate
+  cancel-in-progress: true
+jobs:
+  candidate:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v5
+        with:
+          repository: aleksey-hoffman/sigma-file-manager
+          ref: d0da797fa1ded2f8601d0e065329da06b43971e9
+          path: sigma-upstream
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24.16.0'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: sigma-upstream/src-tauri
+      - run: python sigma-integration/apply_patch.py sigma-upstream
+      - name: Install exact upstream dependencies
+        working-directory: sigma-upstream
+        run: npm ci
+      - name: Build patched Sigma executable
+        working-directory: sigma-upstream
+        run: npm run tauri -- build --no-bundle
+      - name: Test real Sigma and ALEC client on Windows
+        run: node desktop-redesign/native/testar-sigma-real.mjs sigma-upstream/src-tauri/target/release/sigma-file-manager.exe
+      - name: Include executable, corresponding source and patch
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force sigma-candidate | Out-Null
+          Copy-Item sigma-upstream/src-tauri/target/release/sigma-file-manager.exe sigma-candidate/
+          Copy-Item sigma-integration/alec_file_bridge.rs,sigma-integration/apply_patch.py,sigma-integration/README.md sigma-candidate/
+          git -C sigma-upstream archive --format=zip --output=../sigma-candidate/sigma-upstream-source.zip HEAD
+          if ($LASTEXITCODE) { throw 'Source archive failed' }
+          $hash = (Get-FileHash sigma-candidate/sigma-file-manager.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content sigma-candidate/SHA256.txt "$hash  sigma-file-manager.exe"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Sigma-ALEC-2.3.0-Windows-x64-candidate
+          path: sigma-candidate/
+          if-no-files-found: error
+          retention-days: 30
