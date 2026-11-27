@@ -73,3 +73,32 @@
  .pane .alec-vitals{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(max-width:310px){.body{padding-inline:10px!important}.alec-account-group,.alec-news-card,.alec-universal-card{padding:9px}.pane .alec-vitals{grid-template-columns:minmax(0,1fr)}}
+
+/* Header: fixed-size controls in a second row when space is constrained. */
+.head,.head-text,.who{min-width:0;max-width:100%;box-sizing:border-box}
+.head .who{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.head .who h1{min-width:0;font-size:17px;letter-spacing:.17em}
+.head #head-update{max-width:100%;min-width:0;white-space:normal;overflow-wrap:anywhere}
+.head .head-quit{margin-inline-start:0}
+.head .head-close,.head .alec-window-tool{flex:none}
+.head .head-quit span{white-space:normal}
+@media(max-width:480px){
+ .head{padding:8px 10px!important;min-height:0}
+ .head .who{display:grid;grid-template-columns:17px minmax(0,1fr) auto 25px 25px 25px;gap:6px;align-items:center}
+ .head .who>.alec-official-logo{grid-column:1;grid-row:1}
+ .head .who h1{grid-column:2;grid-row:1}
+ .head .ver{grid-column:3;grid-row:1;text-align:right}
+ .head #alec-nav-back{grid-column:4;grid-row:1}
+ .head #alec-sidebar-toggle{grid-column:5;grid-row:1}
+ .head #head-close{grid-column:6;grid-row:1}
+ .head #head-update{grid-column:1/5;grid-row:2;justify-self:start;min-height:25px}
+ .head #head-quit{grid-column:5/7;grid-row:2;justify-self:end}
+}
+.pane input:not([type=checkbox]):not([type=radio]):not([type=range]),.pane select,.pane textarea{min-width:0;max-width:100%;box-sizing:border-box}
+.pane .alec-memory-list{max-height:none;overflow:visible}
+.pane .alec-trait input{min-width:0;max-width:100%}
+.pane .alec-agent-fields>button{width:100%}
+.pane .alec-bridge-root{flex-wrap:wrap}
+.pane .alec-bridge-root input{flex:1 1 100%}
+.pane .setting:has(>.field.select)>.field.select{width:100%}
+.pane .list>li{min-width:0;max-width:100%;box-sizing:border-box}
