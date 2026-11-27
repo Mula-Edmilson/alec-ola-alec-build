@@ -15,13 +15,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
-      EXPECTED_SHA: 15e227153e1681b90e8493d209a3f1d3263e72fc
-      RUN_ID: '45984883306'
+      EXPECTED_SHA: 8261c194550f1de0f74aec9a2c9fd6684b3ee9e1
+      FUNCTIONAL_SHA: 15e227153e1681b90e8493d209a3f1d3263e72fc
+      RUN_ID: '45985800228'
       TAG: v0.3.4
     steps:
       - uses: actions/checkout@v5
         with:
-          fetch-depth: 2
+          fetch-depth: 4
           persist-credentials: false
       - uses: actions/setup-node@v5
         with:
@@ -33,14 +34,19 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD^)" = "$EXPECTED_SHA"
           test "$(git diff --name-only "$EXPECTED_SHA" HEAD)" = ".github/workflows/alec-publish-v034.yml"
-          functional="$(gh run view 45980413151 --json status,conclusion,headSha,headBranch,workflowName --repo "$GITHUB_REPOSITORY")"
-          jq -e --arg sha "$EXPECTED_SHA" '.status=="completed" and .conclusion=="success" and .headSha==$sha and .headBranch=="alec-browser-developer" and .workflowName=="ALEC Browser Developer functional validation"' <<<"$functional"
+          # The already validated application code is identical: only the CI runner and publication workflow differ.
+          git merge-base --is-ancestor "$FUNCTIONAL_SHA" "$EXPECTED_SHA"
+          test "$(git diff --name-only "$FUNCTIONAL_SHA" "$EXPECTED_SHA")" = "$(printf '%s\n' .github/workflows/alec-publish-v034.yml desktop-redesign/native/executar-testes.mjs)"
+          functional="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/45980413151")"
+          jq '{id,name,path,status,conclusion,head_sha,head_branch}' <<<"$functional"
+          jq -e --arg sha "$FUNCTIONAL_SHA" '.id==45980413151 and .status=="completed" and .conclusion=="success" and .head_sha==$sha and .head_branch=="alec-browser-developer" and .path==".github/workflows/alec-browser-developer-validation.yml"' <<<"$functional"
           # This publication-only commit also triggers signed updater validation. Require its success:
           # the prior validation may be cancelled by its own concurrency policy.
           deadline=$((SECONDS+6500))
           while true; do
-            build="$(gh run view "$RUN_ID" --json status,conclusion,headSha,headBranch,workflowName --repo "$GITHUB_REPOSITORY")"
-            jq -e --arg sha "$EXPECTED_SHA" '.headSha==$sha and .headBranch=="alec-signed-updater" and .workflowName=="ALEC Desktop Windows candidate"' <<<"$build"
+            build="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID")"
+            jq '{id,name,path,status,conclusion,head_sha,head_branch}' <<<"$build"
+            jq -e --arg sha "$EXPECTED_SHA" --argjson id "$RUN_ID" '.id==$id and .head_sha==$sha and .head_branch=="alec-signed-updater" and .path==".github/workflows/alec-desktop-windows.yml"' <<<"$build"
             if jq -e '.status=="completed"' <<<"$build" >/dev/null; then
               jq -e '.conclusion=="success"' <<<"$build"
               break
@@ -49,7 +55,7 @@ jobs:
             sleep 20
           done
           while true; do
-            validation="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$GITHUB_SHA&branch=alec-signed-updater&per_page=100" | jq -c '[.workflow_runs[] | select(.name=="ALEC Signed Updater validation")] | sort_by(.id) | last // {}')"
+            validation="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$GITHUB_SHA&branch=alec-signed-updater&per_page=100" | jq -c '[.workflow_runs[] | select(.path==".github/workflows/alec-signed-update-validation.yml")] | sort_by(.id) | last // {}')"
             if jq -e '.status=="completed"' <<<"$validation" >/dev/null; then
               jq -e --arg sha "$GITHUB_SHA" '.conclusion=="success" and .head_sha==$sha and .head_branch=="alec-signed-updater"' <<<"$validation"
               break
