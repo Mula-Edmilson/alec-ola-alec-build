@@ -1,0 +1,114 @@
+name: ALEC Publish validated 0.3.5
+on:
+  push:
+    branches: [alec-signed-updater]
+    paths: ['.github/workflows/alec-publish-v035.yml']
+permissions:
+  actions: read
+  contents: write
+concurrency:
+  group: alec-publish-v035
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.repository == 'Mula-Edmilson/alec-ola-alec-build'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      EXPECTED_SHA: 6709e4c483b0b3c31c3ba096935e96118bc4b8fe
+      RUN_ID: '45996117440'
+      TAG: v0.3.5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 4
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Verify publication-only commit and wait for exact signed candidate and validation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_SHA"
+          test "$(git diff --name-only "$EXPECTED_SHA" HEAD)" = ".github/workflows/alec-publish-v035.yml"
+          # Exact same application commit already passed the complete candidate audit and installer smoke.
+          functional="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/45992306300")"
+          jq -e --arg sha "$EXPECTED_SHA" '.id==45992306300 and .status=="completed" and .conclusion=="success" and .head_sha==$sha and .head_branch=="alec-panel-polish" and .path==".github/workflows/alec-desktop-windows.yml"' <<<"$functional"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/45992306300/jobs" | jq -e '[.jobs[] | select(.name=="visual-review" or .name=="build")] | length==2 and all(.conclusion=="success")'
+          # This publication-only commit also triggers signed updater validation. Require its success:
+          # the prior validation may be cancelled by its own concurrency policy.
+          deadline=$((SECONDS+6500))
+          while true; do
+            build="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID")"
+            jq '{id,name,path,status,conclusion,head_sha,head_branch}' <<<"$build"
+            jq -e --arg sha "$EXPECTED_SHA" --argjson id "$RUN_ID" '.id==$id and .head_sha==$sha and .head_branch=="alec-signed-updater" and .path==".github/workflows/alec-desktop-windows.yml"' <<<"$build"
+            if jq -e '.status=="completed"' <<<"$build" >/dev/null; then
+              jq -e '.conclusion=="success"' <<<"$build"
+              break
+            fi
+            test "$SECONDS" -lt "$deadline"
+            sleep 20
+          done
+          while true; do
+            validation="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$GITHUB_SHA&branch=alec-signed-updater&per_page=100" | jq -c '[.workflow_runs[] | select(.path==".github/workflows/alec-signed-update-validation.yml")] | sort_by(.id) | last // {}')"
+            if jq -e '.status=="completed"' <<<"$validation" >/dev/null; then
+              jq -e --arg sha "$GITHUB_SHA" '.conclusion=="success" and .head_sha==$sha and .head_branch=="alec-signed-updater"' <<<"$validation"
+              break
+            fi
+            test "$SECONDS" -lt "$deadline"
+            sleep 20
+          done
+      - name: Verify exact signed package and mandatory runtime navigation report
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts" | jq -e --arg sha "$EXPECTED_SHA" '[.artifacts[] | select(.expired==false and .name=="ALEC-Desktop-Preview-Windows-x64-candidate" and .workflow_run.head_sha==$sha)] | length==1'
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name ALEC-Desktop-Preview-Windows-x64-candidate --dir candidate
+          test "$(node -p "require('./desktop-redesign/native/alec-version.json').version")" = "${TAG#v}"
+          node desktop-redesign/native/verify-alec-release.mjs candidate
+          jq -e --arg version "${TAG#v}" '.version==$version' candidate/latest.json
+          test "$(tail -n 1 candidate/SOURCE.txt | tr -d '\r')" = "$EXPECTED_SHA"
+          jq -e '.navigationVerified==true and .revision=="ALEC_ORB_EVOLUTION_V1" and .visible==true and .tabs==8 and .coreLit>=100 and .motionPixels>=50 and .voicePixels>=50' candidate/ALEC-native-visual-report.json
+          # Signed build re-runs the same UI audit; require its full report, not just the job result.
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name ALEC-panel-layout-evidence --dir visual-evidence
+          jq -e '.failures==[] and (.results|length)==160 and all(.results[]; .outside==[] and .collisions==[] and .headerOutside==[] and .headerCollisions==[] and .paletteIssues==[] and .untranslated==[] and .reachable==true)' visual-evidence/layout-report.json
+          test -s candidate/new-source/showcase/panel/alec-theme.css
+          grep -q 'Skill Hub / Ligações' candidate/new-source/showcase/panel/alec-theme.css
+          test -s candidate/LICENSE
+          test -s candidate/ALEC-source.patch
+          test -d candidate/new-source
+          test -s candidate/new-source/showcase/tauri/sidecar/alec-adaptive-memory.mjs
+          test -s candidate/new-source/showcase/tauri/sidecar/alec-proactive.mjs
+          test -s candidate/new-source/showcase/tauri/sidecar/alec-universal.mjs
+          for module in alec-native-agents alec-agent-plans alec-browser-adapter alec-developer-adapter; do test -s "candidate/new-source/showcase/tauri/sidecar/$module.mjs"; done
+          test -s candidate/new-source/showcase/tauri/agent-runtime/package-lock.json
+          test -s candidate/third-party-licenses/Playwright-LICENSE
+          test -s candidate/third-party-licenses/Playwright-Core-LICENSE
+          (cd candidate && zip -qr ALEC-corresponding-source.zip ALEC-source.patch new-source LICENSE SOURCE.txt BUILD-CANDIDATE.md third-party-licenses)
+      - name: Publish the single-channel 0.3.5 update
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/alec-signed-updater" --jq .object.sha)" = "$GITHUB_SHA"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo 'Release already exists; refusing replacement'; exit 1; fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" >/dev/null 2>&1; then echo 'Tag already exists; refusing replacement'; exit 1; fi
+          cat > notes.md <<'EOF'
+          ## ALEC 0.3.5 — Interface & Consistência
+          - Contas: fornecedores ligados e disponíveis em secções, formulários com etiquetas, campos de altura natural, perfis de API e scroll consistente.
+          - Cabeçalho responsivo, margens, abas, botões, interruptores, selectores, tipografia e navegação com identidade azul ALEC.
+          - Skill Hub: permissões e acções de ligação em linhas independentes no painel compacto, sem sobreposição.
+          - Novidades: histórico local de dez versões, com resumos individuais e selecção da versão, mesmo sem Internet.
+          - Mais de 100 textos fixos traduzidos para português. Nomes de modelos, conteúdo do utilizador, mensagens de serviços e alguns textos auxiliares podem permanecer em inglês.
+          - Auditoria automatizada: 160 cenários em 300×410, 380×470, 480×620 e 720×740; sem colisões, cortes horizontais ou violações da paleta nos controlos medidos. Capturas revistas; os dados de pré-visualização são sintéticos.
+          - Sem alterações intencionais à lógica dos agentes, permissões, memória ou fornecedores.
+          **Limitações:** o histórico local apresenta a versão 0.3.5 como candidata na indicação de data; ainda podem existir textos auxiliares em inglês e diferenças em estados não abrangidos pelos testes. Agentes supervisionados, Browser sem JavaScript/redirects, testes de código local sem sandbox de sistema operativo. Memória local não cifrada. Assinatura Tauri não equivale a Authenticode. Actualização e funcionamento no computador do utilizador ainda por confirmar.
+          EOF
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$EXPECTED_SHA" --title "ALEC 0.3.5" --notes-file notes.md --draft --latest=false \
+            candidate/ALEC-Desktop-0.3.5-Preview-x64-setup.exe \
+            candidate/ALEC-Desktop-0.3.5-Preview-x64-setup.exe.sig \
+            candidate/latest.json candidate/SHA256.txt candidate/LICENSE candidate/ALEC-corresponding-source.zip
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest=true
