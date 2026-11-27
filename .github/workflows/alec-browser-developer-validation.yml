@@ -55,7 +55,7 @@ jobs:
       - name: Create disposable TLS fixture and run real browser tests
         shell: bash
         run: |
-          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -keyout "$RUNNER_TEMP/alec.key" -out "$RUNNER_TEMP/alec.crt" -subj '/CN=127.0.0.1' -addext 'subjectAltName=IP:127.0.0.1'
+          MSYS2_ARG_CONV_EXCL='/CN=' openssl req -x509 -newkey rsa:2048 -nodes -days 1 -keyout "$RUNNER_TEMP/alec.key" -out "$RUNNER_TEMP/alec.crt" -subj '/CN=127.0.0.1' -addext 'subjectAltName=IP:127.0.0.1'
           ALEC_FIXTURE_KEY="$RUNNER_TEMP/alec.key" ALEC_FIXTURE_CERT="$RUNNER_TEMP/alec.crt" NODE_EXTRA_CA_CERTS="$RUNNER_TEMP/alec.crt" node --test desktop-redesign/native/test-alec-browser-adapter.mjs
   native-integration:
     runs-on: windows-latest
