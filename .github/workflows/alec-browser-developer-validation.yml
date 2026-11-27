@@ -1,0 +1,31 @@
+name: ALEC Browser Developer foundation validation
+on:
+  push:
+    branches: [alec-browser-developer]
+    paths:
+      - 'desktop-redesign/native/alec-agent-plans.mjs'
+      - 'desktop-redesign/native/test-alec-agent-plans.mjs'
+      - '.github/workflows/alec-browser-developer-validation.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: alec-browser-developer-validation
+  cancel-in-progress: true
+jobs:
+  foundation:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Check agent coordinator syntax
+        run: node --check desktop-redesign/native/alec-agent-plans.mjs
+      - name: Validate agent plan restrictions and lifecycle
+        run: node --test desktop-redesign/native/test-alec-agent-plans.mjs
+      - name: Verify existing universal AI and trust policy
+        run: node --test desktop-redesign/native/test-alec-universal.mjs desktop-redesign/native/test-alec-trust.mjs
