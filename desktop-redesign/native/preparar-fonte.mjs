@@ -716,7 +716,7 @@ function panel() {`);
     const marker="// ALEC's original Remote-inspired particle renderer";
     const i=out[ja].indexOf(marker);
     if(i<0||out[ja].indexOf(marker,i+1)!==-1)throw Error('Legacy Orb renderer boundary missing');
-    out[ja]=out[ja].slice(0,i)+fs.readFileSync(new URL('./alec-orb-evolution.js',import.meta.url),'utf8')+'\\n';
+    out[ja]=out[ja].slice(0,i)+fs.readFileSync(new URL('./alec-orb-evolution.js',import.meta.url),'utf8')+'\n';
     changes.push(ja);
   }
   rep(sc,"safe.revision==='ALEC_ORB_NATIVE_V6'","safe.revision==='ALEC_ORB_EVOLUTION_V1'");
