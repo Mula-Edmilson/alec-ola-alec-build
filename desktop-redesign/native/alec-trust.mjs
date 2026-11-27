@@ -1,6 +1,6 @@
 // Pure capability policy. The caller must supply authenticated origin and canonical resource scope.
 import {randomUUID} from 'node:crypto';
-const capabilities=new Set(['files.read','files.write','screen.read','camera.read','app.control','command.run','skill.run','skill.learn','cloud.sync','evolution.propose']);
+const capabilities=new Set(['files.read','files.write','screen.read','camera.read','app.control','command.run','skill.run','skill.learn','cloud.sync','evolution.propose','browser.read','browser.interact','browser.submit']);
 const origins=new Set(['desktop','remote','proactive','learn','evolution']);
 const maxTTL=24*60*60*1000;
 const validId=v=>typeof v==='string'&&/^[a-zA-Z0-9_.:-]{1,128}$/.test(v);
