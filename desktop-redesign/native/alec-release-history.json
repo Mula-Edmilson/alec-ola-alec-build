@@ -1,5 +1,27 @@
 [
   {
+    "version": "0.3.7",
+    "title": "Hybrid Live",
+    "date": "2026-11-27",
+    "items": [
+      {
+        "kind": "new",
+        "title": "Conversação Live experimental",
+        "text": "Abre a sessão em Escuta com a chave Gemini existente. Áudio e transcrição em tempo real no navegador."
+      },
+      {
+        "kind": "improved",
+        "title": "Alternância Local / Live",
+        "text": "O reconhecimento local é suspenso durante a sessão Live e reposto ao terminar."
+      },
+      {
+        "kind": "new",
+        "title": "Interrupção e eco",
+        "text": "Interrupção da reprodução por evento do servidor e supressão de eco solicitada ao navegador. Fluidez real ainda por validar."
+      }
+    ]
+  },
+  {
     "version": "0.3.6",
     "title": "Conversation Engine",
     "date": "2026-11-27",
