@@ -51,6 +51,7 @@ jobs:
         run: |
           node desktop-redesign/native/preparar-fonte.mjs upstream --public
           node desktop-redesign/native/verificar-paridade.mjs upstream
+          node --test desktop-redesign/native/test-alec-orb-evolution.mjs
           node desktop-redesign/native/testar-tailnet.mjs
           node desktop-redesign/native/testar-voz-alec.mjs
           node desktop-redesign/native/testar-contexto-local.mjs
@@ -198,7 +199,7 @@ jobs:
               throw 'Installed native dashboard did not report a visible orb and all eight navigation entries'
             }
             $report = Get-Content $reportPath -Raw | ConvertFrom-Json
-            if ($report.revision -ne 'ALEC_ORB_NATIVE_V6' -or $report.lit -le 100 -or $report.blue -le 50 -or $report.coreLit -lt 100 -or $report.motionPixels -lt 50 -or $report.voicePixels -lt 50 -or -not $report.visible -or -not $report.compose -or -not $report.noHomeInput -or -not $report.listen -or $report.tabs -ne 8 -or $report.windowWidth -gt 400 -or $report.windowHeight -gt 490) { throw 'Installed dashboard failed required runtime visual assertions' }
+            if ($report.revision -ne 'ALEC_ORB_EVOLUTION_V1' -or $report.lit -le 100 -or $report.blue -le 50 -or $report.coreLit -lt 100 -or $report.motionPixels -lt 50 -or $report.voicePixels -lt 50 -or -not $report.visible -or -not $report.compose -or -not $report.noHomeInput -or -not $report.listen -or $report.tabs -ne 8 -or $report.windowWidth -gt 400 -or $report.windowHeight -gt 490) { throw 'Installed dashboard failed required runtime visual assertions' }
             $visualOut = Join-Path $env:GITHUB_WORKSPACE 'candidate'
             New-Item -ItemType Directory -Force $visualOut | Out-Null
             Copy-Item $reportPath (Join-Path $visualOut 'ALEC-native-visual-report.json')

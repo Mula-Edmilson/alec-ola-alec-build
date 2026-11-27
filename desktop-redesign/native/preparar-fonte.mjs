@@ -711,6 +711,16 @@ function panel() {`);
   rep(pj,"      alecNavigationVerified=true;","      // Exercise the actual in-panel dialog without approving any sensitive action.\n      let accepted=false;alecConfirm('Teste local',()=>{accepted=true;});\n      const d=$('alec-confirm-dialog');if(!d?.open||accepted)throw Error('In-panel dialog failed');\n      d.querySelector('[data-k=\"alec-dialog-cancel\"]').click();\n      if(d.open||accepted)throw Error('Dialog cancel failed');\n      alecNavigationVerified=true;");
   out['showcase/panel/alec-theme.css']+="\n/* ALEC 0.2.3: integrated confirmations, no browser title bar. */\n.alec-dialog{box-sizing:border-box;width:calc(100% - 36px);max-width:310px;max-height:calc(100% - 32px);overflow:auto;margin:auto;padding:17px;color:var(--ink);background:var(--panel);border:1px solid var(--line-hi);border-radius:13px;box-shadow:0 16px 50px #0009;font:13px/1.5 'Segoe UI',sans-serif}.alec-dialog::backdrop{background:#050914b8}.alec-dialog h2{font-size:15px;margin:0 0 8px}.alec-dialog p{margin:0 0 16px;overflow-wrap:anywhere;color:var(--ink-2)}.alec-dialog-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}.alec-dialog-actions button{min-width:90px}.alec-dialog button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}\n";
   if(/\b(?:window\.)?(?:confirm|alert)\s*\(/.test(out[pj]))throw Error('Native browser confirmation remains in ALEC panel');
+  // ALEC Orb Evolution: original renderer, shared by native overlay, dashboard and notch.
+  {
+    const marker="// ALEC's original Remote-inspired particle renderer";
+    const i=out[ja].indexOf(marker);
+    if(i<0||out[ja].indexOf(marker,i+1)!==-1)throw Error('Legacy Orb renderer boundary missing');
+    out[ja]=out[ja].slice(0,i)+fs.readFileSync(new URL('./alec-orb-evolution.js',import.meta.url),'utf8')+'\\n';
+    changes.push(ja);
+  }
+  rep(sc,"safe.revision==='ALEC_ORB_NATIVE_V6'","safe.revision==='ALEC_ORB_EVOLUTION_V1'");
+  rep(dk,"R = form === 'cursor' ? 26 : clamp(S * 0.15, 28, 140) * (form === 'small' ? 0.5 : 1);","R = form === 'cursor' ? 26 : clamp(S * 0.15, 28, look==='jarvis'?72:140) * (form === 'small' ? 0.5 : 1);");
   return {out,changes};
 }
 const paths=["showcase/tauri/sidecar/test/fish.test.mjs","showcase/tauri/src-tauri/build.rs","showcase/tauri/sidecar/sidekick.mjs","showcase/tauri/sidecar/speaker.mjs","showcase/tauri/sidecar/fish.mjs","showcase/tauri/sidecar/local.mjs","showcase/panel/index.html","showcase/panel/panel.js","showcase/panel/panel.css","showcase/roamies/12-sidekick.js","showcase/roamies/jarvis.js","showcase/desktop.html","showcase/tauri/src-tauri/tauri.conf.json","showcase/tauri/src-tauri/src/main.rs","showcase/tauri/src-tauri/voice-win/src/wake.rs","showcase/tauri/src-tauri/voice-win/src/main.rs","showcase/onboarding/onboarding.js","showcase/onboarding/index.html","showcase/tauri/sidecar/test/prompt.test.mjs","showcase/tauri/sidecar/test/snooze.test.mjs","showcase/roamies/10-dither.js","showcase/tauri/src-tauri/src/voice.rs","showcase/roamies/ask-bar.js","showcase/roamies/core.js","showcase/roamies/host.js","showcase/roamies/glass.js","showcase/roamies/agent.js","showcase/roamies/agent-cards.js","showcase/roamies/agent-panel.js","showcase/roamies/ink.js","showcase/roamies/sidebar.js","showcase/roamies/notch.js"];
