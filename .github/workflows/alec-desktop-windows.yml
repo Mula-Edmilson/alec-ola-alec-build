@@ -16,7 +16,8 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
-    if: github.ref_name != 'alec-panel-polish' && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && (github.head_ref == 'alec-desktop-redesign' || github.head_ref == 'alec-proactive-v7' || github.head_ref == 'alec-qr-v7.1')))
+    needs: visual-review
+    if: ${{ always() && ((github.ref_name == 'alec-panel-polish' && needs.visual-review.result == 'success') || (github.ref_name != 'alec-panel-polish' && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && (github.head_ref == 'alec-desktop-redesign' || github.head_ref == 'alec-proactive-v7' || github.head_ref == 'alec-qr-v7.1'))))) }}
     runs-on: windows-latest
     timeout-minutes: 90
     environment: ${{ github.event_name == 'push' && github.ref_name == 'alec-signed-updater' && 'alec-signing' || 'alec-candidate' }}
@@ -59,6 +60,7 @@ jobs:
           if [ "$GITHUB_REF_NAME" = "alec-signed-updater" ]; then node --test desktop-redesign/native/test-alec-update.mjs desktop-redesign/native/test-alec-trust.mjs desktop-redesign/native/test-alec-learn.mjs desktop-redesign/native/test-alec-cloud-evolution.mjs; fi
           if [ "$GITHUB_REF_NAME" = "alec-vision-v8" ]; then node --test desktop-redesign/native/test-alec-sigma-vision.mjs desktop-redesign/native/test-alec-sigma-supervisor.mjs; fi
       - name: Verify compact panel geometry and capture real Edge screenshots
+        if: github.ref_name != 'alec-panel-polish'
         shell: bash
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
@@ -68,7 +70,7 @@ jobs:
           npm install --prefix desktop-redesign/native/.visual-runtime --omit=dev --ignore-scripts --no-audit --no-fund
           node desktop-redesign/native/testar-layout-painel.mjs upstream/showcase visual-evidence
       - name: Upload panel layout report and screenshots even on failure
-        if: always()
+        if: always() && github.ref_name != 'alec-panel-polish'
         uses: actions/upload-artifact@v4
         with:
           name: ALEC-panel-layout-evidence

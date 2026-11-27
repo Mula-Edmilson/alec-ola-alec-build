@@ -54,11 +54,17 @@ try{
     p.scrollTop=p.scrollHeight;const reachable=p.scrollTop+p.clientHeight>=p.scrollHeight-2;p.scrollTop=0;
     const headerOutside=hc.filter(n=>{const r=n.getBoundingClientRect();return r.left<hb.left-1||r.right>hb.right+1||r.top<hb.top-1||r.bottom>hb.bottom+1;}).map(n=>n.id);
     const headerCollisions=[];for(let i=0;i<hc.length;i++)for(let j=i+1;j<hc.length;j++){const a=hc[i].getBoundingClientRect(),b=hc[j].getBoundingClientRect();if(Math.min(a.right,b.right)-Math.max(a.left,b.left)>1&&Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>1)headerCollisions.push([hc[i].id,hc[j].id]);}
-    return {width:p.clientWidth,height:p.clientHeight,scrollHeight:p.scrollHeight,scrollWidth:p.scrollWidth,outside,collisions,headerOutside,headerCollisions,reachable,controls:controls.length};
+    const paletteNodes=[...p.querySelectorAll('.switch,.chord,.cap,.field,input:not([type=range]),textarea,select,.btn'),...header.querySelectorAll('.btn')].filter(n=>!n.closest('[hidden]')&&n.getClientRects().length);
+    const teal=value=>{const m=/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/.exec(value);if(!m)return false;const [,r,g,b]=m.map(Number);return g>r+12&&g>=b-8;};
+    const paletteIssues=[];for(const n of paletteNodes){for(const pseudo of [null,'::before','::after']){const s=getComputedStyle(n,pseudo);if([s.backgroundColor,s.borderTopColor,s.color].some(teal))paletteIssues.push({control:n.dataset.k||n.id||n.className,pseudo,background:s.backgroundColor,color:s.color,border:s.borderTopColor});}}
+    const english=new Set(['Connections','Routines','What I remember','Commitments','Get to know me','Look','Size','Spoken replies','Text only','Voice and text','Voice provider','Voice model','Talking','Hands-free','Voice control','Auto-listen','Wake word','Other keys','Talk','Type to me','General','Sound effects','Open at login','Scheduled jobs','Remove','Change','Run now','Pause','Resume','Sign in','Save','Cancel','Confirm','Approval','Always allow','Ask first']);
+    const untranslated=[...p.querySelectorAll('button,h2,h3,option,label,.sub')].filter(n=>n.getClientRects().length&&english.has(n.textContent.trim())).map(n=>n.textContent.trim());
+    return {width:p.clientWidth,height:p.clientHeight,scrollHeight:p.scrollHeight,scrollWidth:p.scrollWidth,outside,collisions,headerOutside,headerCollisions,reachable,controls:controls.length,paletteIssues,untranslated,paletteControls:paletteNodes.length};
    });
    results.push({viewport:[width,height],label,...result});
    assert.equal(result.outside.length,0,label+' clipped controls: '+JSON.stringify(result.outside));
    assert.equal(result.collisions.length,0,label+' overlapping controls: '+JSON.stringify(result.collisions));
+   assert.deepEqual(result.paletteIssues,[],label+' inherited teal palette');assert.deepEqual(result.untranslated,[],label+' untranslated interface controls');
    assert.deepEqual(result.headerOutside,[],label+' header clipped');assert.deepEqual(result.headerCollisions,[],label+' header overlap');
    assert.ok(result.reachable,label+' scroll end unreachable');
    assert.ok(result.scrollWidth<=result.width+2,label+' horizontal overflow');

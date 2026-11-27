@@ -102,3 +102,91 @@
 .pane .alec-bridge-root input{flex:1 1 100%}
 .pane .setting:has(>.field.select)>.field.select{width:100%}
 .pane .list>li{min-width:0;max-width:100%;box-sizing:border-box}
+
+/* Final visual system: ALEC blue / slate, one field surface, one control language. */
+:root{color-scheme:dark;--alec-control:#0d1728;--alec-control-border:#354764;--alec-active:#203655;--alec-active-border:#83a9ef;--alec-focus:#aec9ff;--alec-disabled:#64748c;--accent:#a6baff;--line:#293950;--line-hi:#354764;--line-hot:#83a9ef}
+.frame{color-scheme:dark}
+.frame .px{--bw:1px}
+.frame .field{--bc:var(--alec-control-border);--fill:var(--alec-control);border-radius:7px}
+.frame .field::before{border-radius:7px}
+.frame .field:has(:focus-visible){--bc:var(--alec-focus);--bw:1px}
+.frame .field:has(:focus-visible)::before{box-shadow:none}
+.frame :is(.pane,.alec-dialog) :is(input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea){
+ color:var(--alec-text);background-color:var(--alec-control);border:1px solid var(--alec-control-border);border-radius:7px;
+ font:400 12px/1.45 "Segoe UI",sans-serif;font-stretch:normal;min-height:32px;padding:7px 9px;box-sizing:border-box;accent-color:#86a9f4
+}
+.frame .pane .field>:is(input:not([type=checkbox]):not([type=radio]):not([type=range]),select){border:0;background-color:transparent;border-radius:7px}
+.frame .pane .alec-account-list .field>input{border:1px solid var(--alec-control-border);background-color:var(--alec-control)}
+.frame :is(.pane,.alec-dialog) textarea{resize:vertical;min-height:66px;max-width:100%}
+.frame .pane select{appearance:none;padding-right:25px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3' fill='none' stroke='%23a5b6cf' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center}
+.frame .pane select option,.frame .pane select optgroup{background:var(--alec-control);color:var(--alec-text)}
+.frame :is(input,textarea)::placeholder{color:#8296b6;opacity:1}
+.frame .pane :is(input,textarea,select):disabled{opacity:.55;cursor:not-allowed}
+.frame .pane :is(input[type=checkbox],input[type=radio],input[type=range]){accent-color:#86a9f4}
+.frame .switch{--bc:var(--alec-control-border);--fill:#26334b;width:44px;height:24px;border-radius:20px;flex:none}
+.frame .switch::before{border-radius:20px}
+.frame .switch::after{width:16px;height:16px;top:4px;left:4px;border-radius:50%;background:#b3c0d7;box-shadow:none;transition:transform .16s ease,background-color .16s ease}
+.frame .switch[aria-checked="true"]{--bc:#82a7f4;--fill:#355a94}
+.frame .switch[aria-checked="true"]::after{transform:translateX(20px);background:#f2f6ff;box-shadow:none}
+.frame .switch:disabled{opacity:.45}
+.frame .chord{--bc:var(--alec-control-border);--fill:var(--alec-control);border-radius:7px;padding:2px}
+.frame .chord .cap,.frame .cap{--bc:var(--alec-control-border);--fill:var(--alec-control);--bw:1px;color:#c5d4eb;border-radius:6px;box-shadow:none;font-weight:500}
+.frame .chord .cap::before,.frame .cap::before{border-radius:5px}
+.frame .chord[aria-checked="true"]{--bc:var(--alec-active-border);--fill:var(--alec-active)}
+.frame .chord[aria-checked="true"] .cap{--bc:#6485c6;--fill:var(--alec-active);color:#e6efff}
+.frame .prov{--bc:var(--alec-control-border);--fill:var(--alec-control)}
+.frame .prov.on,.frame .prov[aria-checked="true"],.frame .prov:active{--bc:var(--alec-active-border);--fill:var(--alec-active)}
+.frame .btn{font:500 11px/1.35 "Segoe UI",sans-serif;letter-spacing:.01em;text-transform:none;min-height:30px;--fill:var(--alec-control);--bc:var(--alec-control-border)}
+.frame .btn.ghost:hover{--fill:#1a2b45;--bc:var(--alec-active-border)}
+.frame .btn.ghost:active{--fill:#223b60}
+.frame .btn.primary{--bc:#a6baff;--fill:#a6baff;color:#0b1527}
+.frame .btn.primary:hover{--bc:#d6e0ff;--fill:#d6e0ff}
+.frame .btn.primary:disabled{--bc:#34435b;--fill:#26354b;color:#a4b3ca}
+.frame .btn.ghost:disabled{--bc:#293950;--fill:#101a2b;color:var(--alec-disabled)}
+.frame .head .btn.mini{min-height:25px;padding:5px 8px}
+.frame .navi:hover{--fill:#14233a;--bc:#29405e}
+.frame .navi[aria-current="page"]{--fill:#1b3151;--bc:#6e94de;color:#d5e4ff}
+.frame .navi:focus-visible{outline:2px solid #aec9ff;outline-offset:-2px;--fill:#203655;--bc:#83a9ef;background:#83a9ef}
+.frame .navi:focus-visible::before{box-shadow:none}
+.frame .looktile[aria-checked="true"]{--fill:#1b3151;--bc:#83a9ef}
+.frame .tip{--fill:#15243c;--bc:#425d8a;color:#e3ecff}
+.frame .led.on,.frame .led.busy{box-shadow:0 0 6px #7fa8f580}
+.frame .effort-range::-webkit-slider-thumb{border-radius:50%;background:#a6baff;box-shadow:none}
+.frame .effort-range::-moz-range-thumb{border-radius:50%;background:#a6baff;box-shadow:none}
+.frame .effort-range::-webkit-slider-runnable-track{border-radius:5px}
+.frame .pane .ghead h2,.frame .pane .group>h2{font:600 13px/1.4 "Segoe UI",sans-serif;letter-spacing:0}
+.frame .pane .sub{font:600 10px/1.4 "Segoe UI",sans-serif;letter-spacing:.05em;color:#a5b6cf}
+.frame .pane .item .text{min-width:0;overflow-wrap:anywhere}
+.frame .pane .item .text small{white-space:normal;overflow-wrap:anywhere}
+.frame .pane .link.danger,.frame .pane .late{color:#ffabab}
+.frame .pane .alec-news-notes{line-height:1.55}
+.frame .pane .alec-bridge-check{border-radius:7px;background:#101a2d}
+.frame .pane .alec-trait label{font:500 12px/1.45 "Segoe UI",sans-serif}
+.frame .pane .alec-dialog-actions{flex-wrap:wrap}
+@media(min-width:481px){
+ .head #head-update{margin-inline-start:auto}
+ .head .who{gap:9px}
+ .body{padding:0 20px!important}
+ .pane:not(#pane-home):not([hidden]){padding:18px 10px 20px 0!important}
+ .pane:not(#pane-home)>.group,.pane:not(#pane-home)>.tabpanel,.pane:not(#pane-home)>.alec-page-title,.pane:not(#pane-home)>.alec-news-head,.pane:not(#pane-home)>.mhead,.pane:not(#pane-home)>.alec-settings-grid,.pane:not(#pane-home)>.alec-about-hero,.pane:not(#pane-home)>.pfoot{width:100%;max-width:640px;align-self:center}
+ .frame .pane .btn{font-size:12px;min-height:32px}
+ .frame .pane .alec-page-title h2,.frame .pane .alec-model-head h2,.frame .pane .alec-news-head h2{font-size:18px}
+ .frame .pane .ghead h2,.frame .pane .group>h2{font-size:15px}
+ .frame .pane .ghead p,.frame .pane .alec-news-card p{font-size:12px}
+ .frame .pane .alec-account-group,.frame .pane .alec-news-card,.frame .pane .alec-universal-card{padding:15px}
+ .frame .pane .alec-account-list .acct .setting{grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px}
+ .frame .pane .alec-account-list .acct .row-btns,.frame .pane .alec-account-list .acct .links{justify-content:flex-end}
+ #pane-home .alec-dashboard{padding-top:18px;gap:10px}
+ #pane-home .alec-orb-wrap{width:220px;height:220px;min-height:220px}
+ #pane-home .alec-feedback-card{max-width:500px}
+}
+@media(min-width:640px){
+ .split{grid-template-columns:156px minmax(0,1fr)}
+ .side{width:156px;padding:10px 7px}
+ .side .navi{justify-content:flex-start;padding:8px;gap:8px}
+ .side .navi .alec-nav-copy{display:grid;min-width:0;text-align:left}
+ .side .navi .alec-nav-copy strong{font-size:11px;white-space:normal;overflow-wrap:anywhere}
+ .side .navi .alec-nav-copy small{display:none}
+ .alec-nav-expanded .side{position:relative;width:156px;box-shadow:none;padding:10px 7px}
+}
+@media(prefers-reduced-motion:reduce){.frame .switch::after{transition:none}}
