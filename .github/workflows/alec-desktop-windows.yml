@@ -5,7 +5,7 @@ on:
     branches: [main]
     types: [opened, synchronize, reopened]
   push:
-    branches: [alec-desktop-redesign, alec-proactive-v7, alec-qr-v7.1, alec-qr-v7.2, alec-vision-v8, alec-signed-updater]
+    branches: [alec-desktop-redesign, alec-proactive-v7, alec-qr-v7.1, alec-qr-v7.2, alec-vision-v8, alec-signed-updater, alec-browser-developer]
     paths:
       - '.github/workflows/alec-desktop-windows.yml'
       - 'desktop-redesign/native/**'
@@ -51,7 +51,7 @@ jobs:
         run: |
           node desktop-redesign/native/preparar-fonte.mjs upstream --public
           node desktop-redesign/native/verificar-paridade.mjs upstream
-          node --test desktop-redesign/native/test-alec-orb-evolution.mjs desktop-redesign/native/test-alec-adaptive-memory.mjs desktop-redesign/native/test-alec-proactive.mjs desktop-redesign/native/test-alec-universal.mjs
+          node --test desktop-redesign/native/test-alec-orb-evolution.mjs desktop-redesign/native/test-alec-adaptive-memory.mjs desktop-redesign/native/test-alec-proactive.mjs desktop-redesign/native/test-alec-universal.mjs desktop-redesign/native/test-alec-agent-plans.mjs desktop-redesign/native/test-alec-developer-adapter.mjs desktop-redesign/native/test-alec-native-agents.mjs
           node desktop-redesign/native/testar-tailnet.mjs
           node desktop-redesign/native/testar-voz-alec.mjs
           node desktop-redesign/native/testar-contexto-local.mjs
@@ -90,6 +90,15 @@ jobs:
       - name: Install Tauri CLI
         shell: bash
         run: cargo install tauri-cli --version "^2" --locked
+      - name: Package pinned Playwright libraries without browser downloads
+        shell: bash
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+        run: |
+          mkdir -p upstream/showcase/tauri/agent-runtime
+          cp desktop-redesign/native/agent-runtime-package.json upstream/showcase/tauri/agent-runtime/package.json
+          npm install --prefix upstream/showcase/tauri/agent-runtime --omit=dev --ignore-scripts --no-audit --no-fund
+          node -e "for(const n of ['playwright','playwright-core'])if(require('./upstream/showcase/tauri/agent-runtime/node_modules/'+n+'/package.json').version!=='1.65.1')process.exit(1)"
       - name: Compile Windows x64 NSIS installer
         working-directory: upstream/showcase/tauri
         shell: bash
@@ -143,6 +152,8 @@ jobs:
           if (-not ($perms -match '"type":"perms"')) { throw 'Voice helper failed to start' }
           & (Join-Path $dir 'roamies-node.exe') --check (Join-Path $dir 'sidecar/sidekick.mjs')
           if ($LASTEXITCODE) { throw 'Bundled sidecar syntax failed' }
+          & (Join-Path $dir 'roamies-node.exe') (Join-Path $env:GITHUB_WORKSPACE 'desktop-redesign/native/testar-agentes-instalados.mjs') $dir
+          if ($LASTEXITCODE) { throw 'Bundled agent runtime or Edge sandbox smoke test failed' }
           $data = Join-Path $env:RUNNER_TEMP 'alec-smoke'
           $configDir = Join-Path $data 'Roamies/Data'
           New-Item -ItemType Directory -Force $configDir | Out-Null
@@ -238,10 +249,15 @@ jobs:
         run: |
           git -C upstream diff --binary HEAD > candidate/ALEC-source.patch
           mkdir -p candidate/new-source
-          git -C upstream ls-files --others --exclude-standard -- showcase/tauri/sidecar/alec-qr-runtime.mjs showcase/tauri/sidecar/alec-qrcode.cjs showcase/tauri/sidecar/alec-local-context.mjs showcase/tauri/sidecar/alec-voice-preference.mjs showcase/tauri/sidecar/alec-legacy-profile.mjs showcase/tauri/sidecar/alec-skill-hub.mjs showcase/tauri/sidecar/alec-bridge-supervisor.mjs showcase/panel/alec-theme.css showcase/tauri/sidecar/alec-wake-phrase.mjs showcase/tauri/sidecar/test/alec-wake-phrase.test.mjs showcase/tauri/sidecar/alec-sigma-vision.mjs showcase/tauri/sidecar/alec-sigma-supervisor.mjs showcase/tauri/sidecar/alec-update.mjs showcase/tauri/sidecar/alec-trust.mjs showcase/tauri/sidecar/alec-learn.mjs showcase/tauri/sidecar/alec-cloud.mjs showcase/tauri/sidecar/alec-cloud-local.mjs showcase/tauri/sidecar/alec-evolution.mjs showcase/tauri/sidecar/alec-adaptive-memory.mjs showcase/tauri/sidecar/alec-proactive.mjs showcase/tauri/sidecar/alec-universal.mjs | while IFS= read -r f; do
+          git -C upstream ls-files --others --exclude-standard -- showcase/tauri/sidecar/alec-qr-runtime.mjs showcase/tauri/sidecar/alec-qrcode.cjs showcase/tauri/sidecar/alec-local-context.mjs showcase/tauri/sidecar/alec-voice-preference.mjs showcase/tauri/sidecar/alec-legacy-profile.mjs showcase/tauri/sidecar/alec-skill-hub.mjs showcase/tauri/sidecar/alec-bridge-supervisor.mjs showcase/panel/alec-theme.css showcase/tauri/sidecar/alec-wake-phrase.mjs showcase/tauri/sidecar/test/alec-wake-phrase.test.mjs showcase/tauri/sidecar/alec-sigma-vision.mjs showcase/tauri/sidecar/alec-sigma-supervisor.mjs showcase/tauri/sidecar/alec-update.mjs showcase/tauri/sidecar/alec-trust.mjs showcase/tauri/sidecar/alec-learn.mjs showcase/tauri/sidecar/alec-cloud.mjs showcase/tauri/sidecar/alec-cloud-local.mjs showcase/tauri/sidecar/alec-evolution.mjs showcase/tauri/sidecar/alec-adaptive-memory.mjs showcase/tauri/sidecar/alec-proactive.mjs showcase/tauri/sidecar/alec-universal.mjs showcase/tauri/sidecar/alec-agent-plans.mjs showcase/tauri/sidecar/alec-browser-adapter.mjs showcase/tauri/sidecar/alec-developer-adapter.mjs showcase/tauri/sidecar/alec-native-agents.mjs | while IFS= read -r f; do
             mkdir -p "candidate/new-source/$(dirname "$f")"
             cp "upstream/$f" "candidate/new-source/$f"
           done
+          mkdir -p candidate/new-source/showcase/tauri/agent-runtime
+          cp upstream/showcase/tauri/agent-runtime/package.json upstream/showcase/tauri/agent-runtime/package-lock.json candidate/new-source/showcase/tauri/agent-runtime/
+          mkdir -p candidate/third-party-licenses
+          cp upstream/showcase/tauri/agent-runtime/node_modules/playwright/LICENSE candidate/third-party-licenses/Playwright-LICENSE
+          cp upstream/showcase/tauri/agent-runtime/node_modules/playwright-core/LICENSE candidate/third-party-licenses/Playwright-Core-LICENSE
           cp upstream/LICENSE candidate/LICENSE
           cp desktop-redesign/native/BUILD-CANDIDATE.md candidate/
           echo 'Upstream: https://github.com/KenKaiii/Roamies/tree/362645466349f4c520ad453d94a94c2481776c2f' > candidate/SOURCE.txt
