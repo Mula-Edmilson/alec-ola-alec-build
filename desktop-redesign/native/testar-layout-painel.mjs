@@ -65,11 +65,16 @@ try{
   };
   try{
    for(const route of ['home','conversations','vision','memory','remote','abilities','settings','about','appearance','speaking','listening','shortcuts','general']){
-    await open('tab='+route);
-    await page.screenshot({path:path.join(dest,route+'-'+width+'.png')});
-    await measure('#pane-'+route,'page-'+route);
-    const tabs=await page.locator('#pane-'+route+' [role=tab]').evaluateAll(nodes=>nodes.map(n=>n.id));
-    for(const id of tabs){await page.locator('#pane-'+route+' #'+id).click();await measure('#pane-'+route,route+'-'+id);await page.screenshot({path:path.join(dest,route+'-'+id+'-'+width+'.png')});}
+    try{
+     await open('tab='+route);
+     await page.screenshot({path:path.join(dest,route+'-'+width+'.png')});
+     await measure('#pane-'+route,'page-'+route);
+     const tabs=await page.locator('#pane-'+route+' [role=tab]').evaluateAll(nodes=>nodes.map(n=>n.id));
+     for(const id of tabs){await page.locator('#pane-'+route+' #'+id).click();await measure('#pane-'+route,route+'-'+id);await page.screenshot({path:path.join(dest,route+'-'+id+'-'+width+'.png')});}
+     const scrolled=await page.locator('#pane-'+route).evaluate(p=>{if(p.scrollHeight<=p.clientHeight+2)return false;p.scrollTop=p.scrollHeight;return true;});
+     if(scrolled)await page.screenshot({path:path.join(dest,route+'-bottom-'+width+'.png')});
+     assert.deepEqual(errors,[],'JavaScript errors in '+route);
+    }catch(e){await page.screenshot({path:path.join(dest,'failure-'+route+'-'+width+'.png')}).catch(()=>{});failures.push({viewport:[width,height],scenario:route,message:e.message,errors:[...errors]});console.error(route+' '+width+'x'+height+': '+e.message);}
    }
    await open('tab=model');
    for(const tab of ['default','hybrid','crew','backups','accounts']){
