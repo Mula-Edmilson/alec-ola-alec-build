@@ -150,7 +150,12 @@ export function createLiveActions({authorize,execute,changed=()=>{},schedule=set
   if(stopped)return reject('session_ended');
   if(calls.has(c.id)){
    const old=calls.get(c.id);
-   return old.signature===JSON.stringify([c.name,c.args??{}])?old.response:reject('duplicate_call_id');
+   if(old.signature!==JSON.stringify([c.name,c.args??{}]))return reject('duplicate_call_id');
+   const t=tasks.get(old.response.task_id);
+   if(t&&c.name!=='alec_cancel_task'&&!permitted(t.operation))return reject('permission_revoked');
+   if(t&&c.name==='alec_task_status')return view(t);
+   if(t&&c.name==='alec_start_task')return {task_id:t.id,operation:t.operation,state:t.state,duplicate:true};
+   return old.response;
   }
   if(calls.size>=256)return reject('session_call_limit');
   const args=parse(c.name,c.args??{});let response;
