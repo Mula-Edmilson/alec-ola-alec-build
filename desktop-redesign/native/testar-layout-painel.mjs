@@ -21,6 +21,9 @@ const server=http.createServer(async(req,res)=>{
 await new Promise((ok,no)=>{server.once('error',no);server.listen(0,'127.0.0.1',ok);});
 let browser;
 const results=[],failures=[];
+const history=JSON.parse(await fs.readFile(new URL('./alec-release-history.json',import.meta.url),'utf8'));
+const version=JSON.parse(await fs.readFile(new URL('./alec-version.json',import.meta.url),'utf8')).version;
+const versions=history.filter(r=>r.version===version||r.date!==null).map(r=>r.version);
 try{
  await fs.mkdir(dest,{recursive:true});
  browser=await chromium.launch({channel:'msedge',headless:true,chromiumSandbox:true});
@@ -106,11 +109,11 @@ try{
    await page.locator('#key-openai').waitFor();await measure('#pane-model','api-key-form');
    await open('tab=whatsnew');
    const select=page.locator('[data-k="alec-news-version"]');
-   assert.equal(await select.locator('option').count(),10);
-   assert.equal(await select.inputValue(),'0.3.5');
+   assert.equal(await select.locator('option').count(),versions.length);
+   assert.equal(await select.inputValue(),version);
    await measure('#pane-whatsnew','current-release');
    await page.screenshot({path:path.join(dest,'news-'+width+'.png')});
-   for(const v of ['0.3.4','0.3.3','0.3.2','0.3.1','0.3.0','0.2.3','0.2.2','0.2.1','0.2.0']){
+   for(const v of versions.filter(v=>v!==version)){
     await select.selectOption(v);assert.ok(await page.locator('.alec-news-item').count()>0);
     await measure('#pane-whatsnew','release-'+v);
    }

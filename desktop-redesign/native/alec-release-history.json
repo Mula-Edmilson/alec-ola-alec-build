@@ -1,8 +1,30 @@
 [
   {
+    "version": "0.3.6",
+    "title": "Conversation Engine",
+    "date": null,
+    "items": [
+      {
+        "kind": "improved",
+        "title": "Fim de fala adaptativo",
+        "text": "A pausa usa actividade vocal; perfis Adaptativo e Paciente disponíveis na escuta mãos livres."
+      },
+      {
+        "kind": "fixed",
+        "title": "Uma transcrição final por turno",
+        "text": "Resultados provisórios, tardios, repetidos ou cancelados não iniciam novos pedidos."
+      },
+      {
+        "kind": "improved",
+        "title": "Diagnóstico de latência",
+        "text": "Tempos de fim de fala, reconhecimento, preparação, primeira resposta e áudio recebido, sem guardar transcrições no novo registo."
+      }
+    ]
+  },
+  {
     "version": "0.3.5",
     "title": "Interface & Consistência",
-    "date": null,
+    "date": "2026-11-27",
     "items": [
       {
         "kind": "fixed",
