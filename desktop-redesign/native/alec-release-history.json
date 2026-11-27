@@ -1,5 +1,22 @@
 [
   {
+    "version": "0.3.8",
+    "title": "Native Orb Live",
+    "date": null,
+    "items": [
+      {
+        "kind": "fixed",
+        "title": "Conversa na Orb",
+        "text": "Sem navegador externo: a Orb permanece no ambiente de trabalho durante a sessão de áudio bidireccional."
+      },
+      {
+        "kind": "improved",
+        "title": "Áudio e reacção visual",
+        "text": "Microfone, reprodução e níveis reais sincronizados por IPC local. Esc termina a sessão."
+      }
+    ]
+  },
+  {
     "version": "0.3.7",
     "title": "Hybrid Live",
     "date": "2026-11-27",
