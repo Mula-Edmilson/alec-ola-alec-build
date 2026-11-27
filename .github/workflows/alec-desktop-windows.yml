@@ -110,6 +110,10 @@ jobs:
             upstream/showcase/tauri/src-tauri/voice-win -> target
             upstream/showcase/tauri/src-tauri/hands-win -> target
           key: alec-windows-v7-icon
+      - name: Native Windows voice session regression tests
+        if: github.ref_name == 'alec-conversation-engine'
+        shell: bash
+        run: cargo test --locked --manifest-path upstream/showcase/tauri/src-tauri/voice-win/Cargo.toml --bin roamies-voice
       - name: Install Tauri CLI
         shell: bash
         run: cargo install tauri-cli --version "^2" --locked
