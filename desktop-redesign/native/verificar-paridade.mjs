@@ -46,7 +46,17 @@ for(const f of git('ls-files','--others','--exclude-standard').trim().split('\n'
 const before=f=>git('show','HEAD:'+f).replace(/\r\n/g,'\n');
 const after=f=>readFileSync(path.join(root,f),'utf8').replace(/\r\n/g,'\n');
 const refs=s=>[...s.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g)].map(m=>m[1]);
-for(const file of ['showcase/desktop.html','showcase/panel/index.html','showcase/onboarding/index.html']) assert.deepEqual(refs(after(file)),refs(before(file)),file+': native script chain');
+// Desktop adds exactly one reviewed local script after the original host. Keep the complete
+// original sequence (including order), and reject duplicates, remote scripts or other additions.
+for(const file of ['showcase/desktop.html','showcase/panel/index.html','showcase/onboarding/index.html']){
+ const expected=refs(before(file));
+ if(file==='showcase/desktop.html'){
+  const host=expected.indexOf('roamies/host.js');
+  assert.ok(host>=0 && expected.lastIndexOf('roamies/host.js')===host,'Unique native host script required');
+  expected.splice(host+1,0,'roamies/alec-native-live.js');
+ }
+ assert.deepEqual(refs(after(file)),expected,file+': native script chain');
+}
 const core='showcase/tauri/sidecar/';
 const protectedPaths=git('ls-files','showcase/roamies',core,'showcase/tauri/src-tauri/hands-win','showcase/tauri/src-tauri/voice-win').trim().split('\n').filter(f=>!allowed.has(f));
 assert.ok(protectedPaths.length>30,'Native module inventory incomplete');
@@ -134,3 +144,7 @@ console.log('Parity source gate OK: '+protectedPaths.length+' original tracked p
 assert.equal(after('showcase/roamies/alec-native-live.js'),readFileSync(new URL('./alec-native-live.js',import.meta.url),'utf8').replace(/\r\n/g,'\n'),'Native Live client integrity mismatch');
 assert.ok(!source.includes('openUrl(host.url)'),'External browser Live launch prohibited');
 assert.ok(source.includes('!alecLiveLocked && VOICE_OK'),'Native microphone lock missing');
+
+assert.equal(after('showcase/roamies/alec-live-capture.js'),readFileSync(new URL('../live/capture.js',import.meta.url),'utf8').replace(/\r\n/g,'\n'),'Native capture worklet integrity mismatch');
+assert.equal(after(core+'alec-live-transport.mjs'),readFileSync(new URL('../live/transport.mjs',import.meta.url),'utf8').replace(/\r\n/g,'\n'),'Live transport integrity mismatch');
+assert.ok(shell.includes('sidecar_send, alec_native_live_send, set_typing')&&shell.includes('ALEC_LIVE_WINDOW.lock().unwrap().as_deref() != Some(window.label())')&&shell.includes('starts_with("alec_native_live_") { return; }'),'Live IPC must stay exclusive to the selected native overlay');
