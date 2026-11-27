@@ -6,8 +6,8 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {setTimeout as delay} from 'node:timers/promises';
 const run=promisify(execFile);
-// A manually requested process inventory may need a cold PowerShell Add-Type compilation.
-// Keep automatic polling at its original bound; do not retry on every background tick.
+// Keep automatic polling bounded; manual diagnostics have a bounded timeout.
+// The default diagnostic path no longer compiles C#.
 export const diagnosticTimeout=details=>details?25000:10000;
 export const diagnosticFailure=e=>e?.killed===true?'timeout':e instanceof SyntaxError?'invalid_json':'provider_error';
 export const DEFAULT_SETTINGS=Object.freeze({enabled:false,system:true,foreground:false,clipboard:false,alerts:false});
@@ -18,27 +18,33 @@ const num=n=>typeof n==='number'&&Number.isFinite(n)&&n>=0?n:null;
 const cpuTotal=()=>os.cpus().reduce((a,c)=>{a.idle+=c.times.idle;a.total+=Object.values(c.times).reduce((x,y)=>x+y,0);return a;},{idle:0,total:0});
 export function cpuPercent(a,b){const t=b.total-a.total,i=b.idle-a.idle;return t>0&&i>=0?pct(100*(1-i/t)):null;}
 // Constant PowerShell program: no arbitrary input or clipboard text, no window titles.
-const WIN_SCRIPT=String.raw`
+const CONTEXT_NATIVE=String.raw`
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
 public static class AlecLocalVitals {
- [StructLayout(LayoutKind.Sequential)] public struct PowerStatus { public byte AC; public byte Flag; public byte Percent; public byte Reserved; public uint Life; public uint FullLife; }
- [DllImport("kernel32.dll")] public static extern bool GetSystemPowerStatus(out PowerStatus s);
  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
  [DllImport("user32.dll")] public static extern uint GetClipboardSequenceNumber();
  [DllImport("user32.dll")] public static extern bool IsClipboardFormatAvailable(uint format);
 }
 '@
+`;
+const WIN_SCRIPT=String.raw`
+$ErrorActionPreference='Stop'
+$ProgressPreference='SilentlyContinue'
+[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false)
+__CONTEXT_NATIVE__
 $o=[ordered]@{battery=$null;ac=$null;app=$null;clipSeq=$null;clipType=$null;processes=@()}
 if (__SYSTEM__) {
- $p=New-Object AlecLocalVitals+PowerStatus
- if ([AlecLocalVitals]::GetSystemPowerStatus([ref]$p) -and ($p.Flag -band 128) -eq 0 -and $p.Percent -le 100) {
-  $o.battery=[int]$p.Percent
-  if ($p.AC -le 1) { $o.ac=($p.AC -eq 1) }
+ # Framework assembly load only; no dynamic C# compiler, WMI query, or network.
+ Add-Type -AssemblyName System.Windows.Forms
+ $p=[System.Windows.Forms.SystemInformation]::PowerStatus
+ if (([int]$p.BatteryChargeStatus -band 128) -eq 0 -and $p.BatteryLifePercent -ge 0 -and $p.BatteryLifePercent -le 1) {
+  $o.battery=[int][math]::Round(100*$p.BatteryLifePercent)
+  if ([int]$p.PowerLineStatus -le 1) { $o.ac=([int]$p.PowerLineStatus -eq 1) }
  }
 }
 if (__FOREGROUND__) {
@@ -56,16 +62,32 @@ if (__DETAILS__) {
 }
 $o | ConvertTo-Json -Compress -Depth 4
 `;
+// Build a read-only script from boolean capabilities, never from user-supplied code.
+export function diagnosticScript(options,{details=false}={}){
+ const s=settings(options),system=details||s.system;
+ return WIN_SCRIPT.replace('__CONTEXT_NATIVE__',s.foreground||s.clipboard?CONTEXT_NATIVE:'')
+  .replace('__SYSTEM__',system?'$true':'$false').replace('__FOREGROUND__',s.foreground?'$true':'$false')
+  .replace('__CLIPBOARD__',s.clipboard?'$true':'$false').replace('__DETAILS__',details?'$true':'$false');
+}
+// A single bounded retry only for a killed manual read-only query. Keep errors visible.
+export async function queryWindows(script,{details=false,execute=run,exe}={}){
+ const executable=exe||path.join(process.env.SystemRoot||'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe');
+ const args=['-NoLogo','-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')];
+ const opts={windowsHide:true,timeout:diagnosticTimeout(details),maxBuffer:65536,encoding:'utf8'};
+ let result;
+ try { result=await execute(executable,args,opts); }
+ catch(e){if(!details||diagnosticFailure(e)!=='timeout')throw e;result=await execute(executable,args,opts);}
+ const q=JSON.parse(result.stdout.trim().replace(/^\uFEFF/,''));
+ if(!q||typeof q!=='object'||Array.isArray(q)||!Array.isArray(q.processes))throw new SyntaxError('Unexpected diagnostic schema');
+ return q;
+}
 export async function sampleSystem(options,{details=false}={}){
  const s=settings(options), system=details||s.system, out={cpu:null,ram:null,totalMiB:null,freeMiB:null,diskFreeGiB:null,battery:null,ac:null,app:null,clipSeq:null,clipType:null,processes:[],partial:false};
  if(system){const a=cpuTotal();await delay(300);out.cpu=cpuPercent(a,cpuTotal());const total=os.totalmem(),free=os.freemem();out.ram=total>0?pct(100*(1-free/total)):null;out.totalMiB=Math.round(total/1048576);out.freeMiB=Math.round(free/1048576);try{const d=await fs.statfs(os.homedir());out.diskFreeGiB=Math.round(d.bavail*d.bsize/1073741824*10)/10;}catch{out.partial=true;out.diskIssue='unavailable';}}
  if(process.platform!=='win32'){out.partial=true;return out;}
  if(!system&&!s.foreground&&!s.clipboard)return out;
  try{
-  const script=WIN_SCRIPT.replace('__SYSTEM__',system?'$true':'$false').replace('__FOREGROUND__',s.foreground?'$true':'$false').replace('__CLIPBOARD__',s.clipboard?'$true':'$false').replace('__DETAILS__',details?'$true':'$false');
-  const exe=path.join(process.env.SystemRoot||'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe');
-  const {stdout}=await run(exe,['-NoLogo','-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],{windowsHide:true,timeout:diagnosticTimeout(details),maxBuffer:65536,encoding:'utf8'});
-  const q=JSON.parse(stdout.trim().replace(/^\uFEFF/,''));
+  const q=await queryWindows(diagnosticScript(s,{details}),{details});
   if(system){out.battery=pct(q.battery);out.ac=typeof q.ac==='boolean'?q.ac:null;}
   if(s.foreground)out.app=name(q.app);
   if(s.clipboard){out.clipSeq=Number.isSafeInteger(q.clipSeq)&&q.clipSeq>0?q.clipSeq:null;out.clipType=['files','image','text','other'].includes(q.clipType)?q.clipType:null;}

@@ -178,6 +178,7 @@ jobs:
           if ($LASTEXITCODE) { throw 'Voice ONNX runtime failed' }
           $perms = & (Join-Path $dir 'roamies-voice.exe') --perms
           if (-not ($perms -match '"type":"perms"')) { throw 'Voice helper failed to start' }
+          if (-not (Test-Path (Join-Path $dir 'sidecar/alec-conversation.mjs'))) { throw 'Installed Conversation Engine module missing' }
           & (Join-Path $dir 'roamies-node.exe') --check (Join-Path $dir 'sidecar/sidekick.mjs')
           if ($LASTEXITCODE) { throw 'Bundled sidecar syntax failed' }
           & (Join-Path $dir 'roamies-node.exe') (Join-Path $env:GITHUB_WORKSPACE 'desktop-redesign/native/testar-agentes-instalados.mjs') $dir
@@ -277,10 +278,12 @@ jobs:
         run: |
           git -C upstream diff --binary HEAD > candidate/ALEC-source.patch
           mkdir -p candidate/new-source
-          git -C upstream ls-files --others --exclude-standard -- showcase/tauri/sidecar/alec-qr-runtime.mjs showcase/tauri/sidecar/alec-qrcode.cjs showcase/tauri/sidecar/alec-local-context.mjs showcase/tauri/sidecar/alec-voice-preference.mjs showcase/tauri/sidecar/alec-legacy-profile.mjs showcase/tauri/sidecar/alec-skill-hub.mjs showcase/tauri/sidecar/alec-bridge-supervisor.mjs showcase/panel/alec-theme.css showcase/tauri/sidecar/alec-wake-phrase.mjs showcase/tauri/sidecar/test/alec-wake-phrase.test.mjs showcase/tauri/sidecar/alec-sigma-vision.mjs showcase/tauri/sidecar/alec-sigma-supervisor.mjs showcase/tauri/sidecar/alec-update.mjs showcase/tauri/sidecar/alec-trust.mjs showcase/tauri/sidecar/alec-learn.mjs showcase/tauri/sidecar/alec-cloud.mjs showcase/tauri/sidecar/alec-cloud-local.mjs showcase/tauri/sidecar/alec-evolution.mjs showcase/tauri/sidecar/alec-adaptive-memory.mjs showcase/tauri/sidecar/alec-proactive.mjs showcase/tauri/sidecar/alec-universal.mjs showcase/tauri/sidecar/alec-agent-plans.mjs showcase/tauri/sidecar/alec-browser-adapter.mjs showcase/tauri/sidecar/alec-developer-adapter.mjs showcase/tauri/sidecar/alec-native-agents.mjs | while IFS= read -r f; do
+          git -C upstream ls-files --others --exclude-standard -- showcase/tauri/sidecar/alec-qr-runtime.mjs showcase/tauri/sidecar/alec-qrcode.cjs showcase/tauri/sidecar/alec-local-context.mjs showcase/tauri/sidecar/alec-voice-preference.mjs showcase/tauri/sidecar/alec-legacy-profile.mjs showcase/tauri/sidecar/alec-skill-hub.mjs showcase/tauri/sidecar/alec-bridge-supervisor.mjs showcase/panel/alec-theme.css showcase/tauri/sidecar/alec-wake-phrase.mjs showcase/tauri/sidecar/test/alec-wake-phrase.test.mjs showcase/tauri/sidecar/alec-sigma-vision.mjs showcase/tauri/sidecar/alec-sigma-supervisor.mjs showcase/tauri/sidecar/alec-update.mjs showcase/tauri/sidecar/alec-trust.mjs showcase/tauri/sidecar/alec-learn.mjs showcase/tauri/sidecar/alec-cloud.mjs showcase/tauri/sidecar/alec-cloud-local.mjs showcase/tauri/sidecar/alec-evolution.mjs showcase/tauri/sidecar/alec-adaptive-memory.mjs showcase/tauri/sidecar/alec-proactive.mjs showcase/tauri/sidecar/alec-universal.mjs showcase/tauri/sidecar/alec-agent-plans.mjs showcase/tauri/sidecar/alec-browser-adapter.mjs showcase/tauri/sidecar/alec-developer-adapter.mjs showcase/tauri/sidecar/alec-native-agents.mjs showcase/tauri/sidecar/alec-conversation.mjs showcase/tauri/src-tauri/voice-win/src/alec_conversation.rs | while IFS= read -r f; do
             mkdir -p "candidate/new-source/$(dirname "$f")"
             cp "upstream/$f" "candidate/new-source/$f"
           done
+          test -s candidate/new-source/showcase/tauri/sidecar/alec-conversation.mjs
+          test -s candidate/new-source/showcase/tauri/src-tauri/voice-win/src/alec_conversation.rs
           mkdir -p candidate/new-source/showcase/tauri/agent-runtime
           cp upstream/showcase/tauri/agent-runtime/package.json upstream/showcase/tauri/agent-runtime/package-lock.json candidate/new-source/showcase/tauri/agent-runtime/
           mkdir -p candidate/third-party-licenses
