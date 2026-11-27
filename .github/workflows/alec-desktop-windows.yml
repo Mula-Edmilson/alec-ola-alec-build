@@ -83,6 +83,14 @@ jobs:
         working-directory: upstream/showcase/tauri/sidecar
         shell: bash
         run: npm ci
+      - name: Verify actual esbuild bundle before Windows compilation
+        working-directory: upstream/showcase/tauri/sidecar
+        shell: bash
+        run: |
+          ./bundle.sh
+          node dist/sidekick.mjs --alec-conversation-self-test > conversation-bundle-test.json
+          node -e "const r=require('./conversation-bundle-test.json');if(r.engine!=='ALEC_CONVERSATION_V036'||r.ok!==true)process.exit(1)"
+          rm conversation-bundle-test.json
       - name: Run every sidecar regression test and report all failures
         shell: bash
         run: node desktop-redesign/native/executar-testes.mjs upstream/showcase/tauri/sidecar/test
@@ -178,7 +186,12 @@ jobs:
           if ($LASTEXITCODE) { throw 'Voice ONNX runtime failed' }
           $perms = & (Join-Path $dir 'roamies-voice.exe') --perms
           if (-not ($perms -match '"type":"perms"')) { throw 'Voice helper failed to start' }
-          if (-not (Test-Path (Join-Path $dir 'sidecar/alec-conversation.mjs'))) { throw 'Installed Conversation Engine module missing' }
+          # esbuild embeds the imported module inside sidekick.mjs, not as a loose resource.
+          $conversation = & (Join-Path $dir 'roamies-node.exe') (Join-Path $dir 'sidecar/sidekick.mjs') --alec-conversation-self-test
+          if ($LASTEXITCODE) { throw 'Installed Conversation Engine self-test failed' }
+          $conversationReport = $conversation | ConvertFrom-Json
+          if ($conversationReport.engine -ne 'ALEC_CONVERSATION_V036' -or -not $conversationReport.ok) { throw 'Installed bundle did not execute the Conversation Engine' }
+          Write-Host $conversation
           & (Join-Path $dir 'roamies-node.exe') --check (Join-Path $dir 'sidecar/sidekick.mjs')
           if ($LASTEXITCODE) { throw 'Bundled sidecar syntax failed' }
           & (Join-Path $dir 'roamies-node.exe') (Join-Path $env:GITHUB_WORKSPACE 'desktop-redesign/native/testar-agentes-instalados.mjs') $dir

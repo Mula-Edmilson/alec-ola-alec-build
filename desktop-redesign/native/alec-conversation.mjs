@@ -32,3 +32,10 @@ export function createVoiceTrace({clock=()=>performance.now(),record=()=>{}}={})
  const firstAudio=id=>{const trace=audio.get(id);if(trace){mark('first_audio_received',trace);audio.delete(id);}};
  return {start,run:(trace,fn)=>context.run(trace,fn),mark,bindAudio,firstAudio};
 }
+
+export function conversationSelfTest(){
+ const gate=createVoiceGate(),first=gate.accept('1:2:3'),duplicate=gate.accept('1:2:3'),next=gate.accept('1:2:4');
+ const rows=[];const trace=createVoiceTrace({clock:()=>0,record:(event,data)=>rows.push({event,data})});
+ const tr=trace.start({turnId:'1:2:3',endpointMs:700});trace.run(tr,()=>{trace.mark('model_dispatch');trace.mark('model_dispatch');trace.bindAudio('s1');});trace.firstAudio('s1');
+ return {engine:'ALEC_CONVERSATION_V036',ok:first&&!duplicate&&next&&rows.length===3&&rows[2].data.phase==='first_audio_received'&&endpointProfile('patient')==='patient'};
+}

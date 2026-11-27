@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {endpointProfile,createVoiceGate,createVoiceTrace} from './alec-conversation.mjs';
+import {endpointProfile,createVoiceGate,createVoiceTrace,conversationSelfTest} from './alec-conversation.mjs';
 test('unique final IDs; repeated words in a new take remain valid',()=>{
  const gate=createVoiceGate({limit:3});
  assert.equal(gate.accept('10:1000:1'),true);
@@ -24,3 +24,5 @@ test('invalid native timings are discarded and non-voice marks are ignored',()=>
  t.start({ms:-1,endpointMs:Infinity,finalQueueMs:'secret'});
  assert.deepEqual(rows,[{id:null,endpointMs:null,recognitionMs:null,finalQueueMs:null}]);
 });
+
+test('packaged runtime self-test checks real conversation functions',()=>assert.deepEqual(conversationSelfTest(),{engine:'ALEC_CONVERSATION_V036',ok:true}));
