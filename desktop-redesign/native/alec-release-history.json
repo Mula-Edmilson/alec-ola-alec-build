@@ -1,0 +1,227 @@
+[
+  {
+    "version": "0.3.5",
+    "title": "Interface & Consistência",
+    "date": null,
+    "items": [
+      {
+        "kind": "fixed",
+        "title": "Contas sem cortes",
+        "text": "Formulários e listas com altura natural, campos separados e acções que se reorganizam no painel compacto."
+      },
+      {
+        "kind": "improved",
+        "title": "Navegação e espaçamento",
+        "text": "Abas flexíveis, margens, hierarquia de texto e scroll uniformizados nas páginas."
+      },
+      {
+        "kind": "improved",
+        "title": "Histórico de novidades",
+        "text": "Resumo individual das melhorias de cada versão, disponível mesmo sem ligação à Internet."
+      }
+    ]
+  },
+  {
+    "version": "0.3.4",
+    "title": "Browser & Developer Agent",
+    "date": "2026-11-27",
+    "items": [
+      {
+        "kind": "new",
+        "title": "Browser Agent",
+        "text": "Navegação HTTPS e interacção supervisionada com páginas isoladas."
+      },
+      {
+        "kind": "new",
+        "title": "Developer Agent",
+        "text": "Leitura de projectos, propostas de edição, gravação revista e testes Node autorizados."
+      },
+      {
+        "kind": "new",
+        "title": "Planos revistos",
+        "text": "Importação manual de planos JSON e aprovação individual com Trust Engine."
+      },
+      {
+        "kind": "improved",
+        "title": "Instalação simplificada",
+        "text": "Playwright incluído; reutiliza Microsoft Edge sem descarregar outro navegador."
+      }
+    ]
+  },
+  {
+    "version": "0.3.3",
+    "title": "Universal AI & Skills Engine",
+    "date": "2026-11-27",
+    "items": [
+      {
+        "kind": "new",
+        "title": "Novos fornecedores",
+        "text": "OpenRouter Free, Groq, Cerebras, NVIDIA NIM, Fireworks AI e llama.cpp."
+      },
+      {
+        "kind": "new",
+        "title": "Catálogo Free",
+        "text": "Modelos :free com preço anunciado zero verificado antes do pedido, sem fallback pago."
+      },
+      {
+        "kind": "improved",
+        "title": "Um modelo de cada vez",
+        "text": "Encaminhamento híbrido, novos agentes paralelos e backups automáticos desactivados por defeito."
+      },
+      {
+        "kind": "new",
+        "title": "Receitas de habilidades",
+        "text": "Seis pedidos reutilizáveis para código, design, diagnóstico, ficheiros, documentos e pesquisa."
+      }
+    ]
+  },
+  {
+    "version": "0.3.2",
+    "title": "Proactive Intelligence",
+    "date": "2026-11-27",
+    "items": [
+      {
+        "kind": "new",
+        "title": "Diagnóstico local",
+        "text": "CPU, RAM, bateria, armazenamento e processos com maior consumo de memória."
+      },
+      {
+        "kind": "new",
+        "title": "Monitorização opcional",
+        "text": "Amostragem em repouso, com autorização; alterações do clipboard sem leitura do conteúdo."
+      },
+      {
+        "kind": "improved",
+        "title": "Alertas discretos",
+        "text": "Avisos locais com limites de frequência, sem chamadas à IA nem encerramento de processos."
+      }
+    ]
+  },
+  {
+    "version": "0.3.1",
+    "title": "Adaptive Intelligence",
+    "date": "2026-11-27",
+    "items": [
+      {
+        "kind": "new",
+        "title": "Personalidade",
+        "text": "Seis traços ajustáveis e persistentes."
+      },
+      {
+        "kind": "new",
+        "title": "Memória adaptativa",
+        "text": "Categorias, pesquisa, aprovação, desactivação e eliminação de registos locais."
+      },
+      {
+        "kind": "new",
+        "title": "Aprendizagem explícita",
+        "text": "Pedidos para memorizar informação, sujeitos a revisão."
+      },
+      {
+        "kind": "improved",
+        "title": "Contexto relevante",
+        "text": "Recuperação de memórias aprovadas sem carregar outro modelo."
+      }
+    ]
+  },
+  {
+    "version": "0.3.0",
+    "title": "Orb Evolution",
+    "date": "2026-11-27",
+    "items": [
+      {
+        "kind": "new",
+        "title": "Orb original",
+        "text": "Filamentos tridimensionais, núcleo luminoso e fundo transparente."
+      },
+      {
+        "kind": "improved",
+        "title": "Movimento e áudio",
+        "text": "Animações reactivas com opção de movimento reduzido e Orb flutuante compacto."
+      },
+      {
+        "kind": "improved",
+        "title": "Motor partilhado",
+        "text": "Mesmo motor visual no overlay, painel e notch, sem dependências gráficas adicionais."
+      }
+    ]
+  },
+  {
+    "version": "0.2.3",
+    "title": "Actualizações e arranque",
+    "date": "2026-11-26",
+    "items": [
+      {
+        "kind": "improved",
+        "title": "Actualização directa",
+        "text": "Verificação e instalação assinada pelo botão superior."
+      },
+      {
+        "kind": "improved",
+        "title": "Confirmações nativas",
+        "text": "Diálogos integrados para operações sensíveis."
+      },
+      {
+        "kind": "fixed",
+        "title": "Arranque do Orb",
+        "text": "Handshake repetido e materialização no início da sessão."
+      }
+    ]
+  },
+  {
+    "version": "0.2.2",
+    "title": "Navegação e actualizações",
+    "date": "2026-11-26",
+    "items": [
+      {
+        "kind": "improved",
+        "title": "Canal único",
+        "text": "Verificação a cada 15 minutos e notificação adiada durante tarefas."
+      },
+      {
+        "kind": "improved",
+        "title": "Botão Voltar",
+        "text": "Histórico de navegação e recuperação da posição de scroll."
+      },
+      {
+        "kind": "fixed",
+        "title": "Sigma",
+        "text": "Reorganização dos controlos e do espaço no painel."
+      }
+    ]
+  },
+  {
+    "version": "0.2.1",
+    "title": "Actualização experimental",
+    "date": "2026-11-26",
+    "items": [
+      {
+        "kind": "improved",
+        "title": "Teste de actualização",
+        "text": "Validação experimental da descoberta e instalação assinada, mantendo o core anterior."
+      }
+    ]
+  },
+  {
+    "version": "0.2.0",
+    "title": "Actualizador nativo",
+    "date": "2026-11-26",
+    "items": [
+      {
+        "kind": "new",
+        "title": "Versão ALEC",
+        "text": "Numeração independente do core Roamies 0.1.51."
+      },
+      {
+        "kind": "new",
+        "title": "Actualizador Tauri",
+        "text": "Primeira instalação com chave pública própria e verificação da assinatura."
+      },
+      {
+        "kind": "new",
+        "title": "Módulos experimentais",
+        "text": "Trust, Learn, Cloud local e Evolution."
+      }
+    ]
+  }
+]
