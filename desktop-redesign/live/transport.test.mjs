@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createLiveSession,createResilientLiveSession} from './transport.mjs';
+import {createLiveSession,createResilientLiveSession,createLiveActions} from './transport.mjs';
 class Fake extends EventTarget{readyState=1;bufferedAmount=0;sent=[];send(s){this.sent.push(JSON.parse(s));}close(){this.readyState=3;}message(data){this.dispatchEvent(new MessageEvent('message',{data:JSON.stringify(data)}));}}
 const tick=()=>new Promise(r=>setImmediate(r));
 test('setup gates microphone, sends PCM16, streams audio and flush signal, then closes',async()=>{
@@ -51,4 +51,41 @@ test('idle goAway renews before disconnect; policy close is not retried even aft
   sockets[1].dispatchEvent(new Event('error'));const close=new Event('close');Object.defineProperty(close,'code',{value:1008});sockets[1].dispatchEvent(close);await tick();
   assert.equal(s.state,'closed');assert.equal(events.at(-1).reason,'policy_or_quota');assert.equal(sockets.length,2);
  }finally{s.close();}
+});
+
+test('Live tasks acknowledge immediately while work is pending; audio and reconnect remain independent',async()=>{
+ const sockets=[],events=[],work=[];let complete;
+ const actions=createLiveActions({authorize:()=>true,execute:async args=>{work.push(args);return new Promise(r=>{complete=r;});}});
+ const s=createResilientLiveSession({apiKey:'x',model:'gemini-live',retryDelay:1,actions,socket:()=>{const f=new Fake();sockets.push(f);return f;},emit:e=>events.push(e)});
+ try{
+  const ws=sockets[0];ws.dispatchEvent(new Event('open'));assert.equal(ws.sent[0].setup.tools[0].functionDeclarations.length,3);
+  ws.message({setupComplete:{}});await tick();
+  const fc={id:'task1',name:'alec_start_task',args:{operation:'system_status'}};
+  ws.message({toolCall:{functionCalls:[fc]}});await tick();await tick();
+  const ack=ws.sent.find(x=>x.toolResponse).toolResponse.functionResponses[0];assert.equal(ack.id,'task1');assert.equal(ack.response.state,'queued');
+  assert.equal(work.length,1);assert.ok(s.audio(Buffer.alloc(2560)));
+  ws.message({serverContent:{modelTurn:{parts:[{inlineData:{mimeType:'audio/pcm;rate=24000',data:'AAAAAA=='}}]}}});await tick();assert.ok(events.some(e=>e.type==='audio'));
+  ws.dispatchEvent(new Event('close'));await new Promise(r=>setTimeout(r,25));const second=sockets[1];second.message({setupComplete:{}});await tick();
+  second.message({toolCall:{functionCalls:[fc]}});await tick();assert.equal(work.length,1);
+  complete({ram:45});await tick();
+  second.message({toolCall:{functionCalls:[{id:'status',name:'alec_task_status',args:{task_id:ack.response.task_id}}]}});await tick();
+  assert.equal(second.sent.at(-1).toolResponse.functionResponses[0].response.result.ram,45);
+ }finally{s.close();actions.close();}
+});
+test('Live task policy denies unknown or unapproved actions; cancellation and replay never launch twice',async()=>{
+ let allowed=false,count=0;
+ const actions=createLiveActions({authorize:()=>allowed,execute:async()=>{count++;return {status:'launch_requested'};}});
+ const start=(id,args)=>actions.call({id,name:'alec_start_task',args});
+ try{
+  assert.equal(start('a',{operation:'open_app',app:'notepad'}).error,'not_authorized');
+  allowed=true;
+  assert.equal(start('b',{operation:'open_app',app:'powershell'}).error,'invalid_or_unavailable_tool');
+  assert.equal(start('c',{operation:'open_app',app:'notepad',command:'x'}).error,'invalid_or_unavailable_tool');
+  const t=start('d',{operation:'open_app',app:'notepad'});await tick();await tick();assert.equal(count,1);
+  assert.equal(start('d',{operation:'open_app',app:'notepad'}).task_id,t.task_id);
+  assert.equal(start('e',{operation:'open_app',app:'notepad'}).duplicate,true);await tick();assert.equal(count,1);
+  const read=start('f',{operation:'sigma_search',query:'photos'});actions.cancelCalls(['f']);await tick();assert.equal(count,1);
+  assert.equal(actions.call({id:'status',name:'alec_task_status',args:{task_id:read.task_id}}).state,'cancelled');
+  allowed=false;assert.equal(actions.call({id:'check',name:'alec_task_status',args:{task_id:t.task_id}}).error,'permission_revoked');
+ }finally{actions.close();}
 });

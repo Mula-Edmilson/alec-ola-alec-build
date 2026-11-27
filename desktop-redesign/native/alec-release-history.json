@@ -1,5 +1,22 @@
 [
   {
+    "version": "0.4.0",
+    "title": "Live Intelligence",
+    "date": null,
+    "items": [
+      {
+        "kind": "new",
+        "title": "Live + tarefas",
+        "text": "Fila de actividades autorizadas em paralelo com a conversa: diagnóstico, pesquisa Sigma e abertura de aplicações."
+      },
+      {
+        "kind": "improved",
+        "title": "Continuidade e segurança",
+        "text": "A confirmação da fila não significa conclusão; estado consultável, limites de execução e deduplicação entre reconexões."
+      }
+    ]
+  },
+  {
     "version": "0.3.9",
     "title": "Live Stability",
     "date": null,
