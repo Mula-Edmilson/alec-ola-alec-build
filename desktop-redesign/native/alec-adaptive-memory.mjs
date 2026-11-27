@@ -34,4 +34,4 @@ export function createMemory(file){
   style(){const [p,c,a,h,n,o]=state.traits;return 'Style preferences: professionalism '+p+', creativity '+c+', initiative '+a+', humor '+h+', naturalness '+n+', brevity '+o+' (0–100). Initiative never authorizes actions.';}
  };
 }
-export function explicitMemory(text){const m=clean(text).match(/^(?:alec[,:]?\s+)?(?:memoriza|memorize|lembra-te|lembre-se|recorda|remember)(?:\s+que|\s+that)?\s+(.+)$/i);if(!m)return null;const value=safeText(m[1]);return {category:/^(?:prefiro|gosto|prefer|não gosto|nao gosto)\b/i.test(value)?'preference':/^(?:o meu projecto|meu projecto|projecto|project)\b/i.test(value)?'project':'note',text:value};}
+export function explicitMemory(text){const m=clean(text).match(/^(?:alec[,:]?\s+)?(?:(?:memoriza|lembra-te|lembre-se|recorda)\s+que|(?:memorize|remember)\s+that)\s+(.+)$/i);if(!m)return null;const value=safeText(m[1]);return {category:/^(?:prefiro|gosto|prefer|não gosto|nao gosto)\b/i.test(value)?'preference':/^(?:o meu projecto|meu projecto|projecto|project)\b/i.test(value)?'project':'note',text:value};}
