@@ -78,7 +78,7 @@
    if(active)cleanup(active,false);
    const s={id:event.session,playing:new Set(),pending:[],pendingBytes:0,frames:[],next:0,ready:false,lastPong:performance.now(),mic:0};active=s;R.alecNativeLiveSession=s.id;R.alecLivePin?.();visual(s,'think');
    s.startDeadline=setTimeout(()=>cleanup(s,true,'audio_start_timeout'),20000);
-   s.heartbeat=setInterval(()=>{if(performance.now()-s.lastPong>20000){cleanup(s,true,'sidecar_unavailable');return;}send(s,'alec_native_live_ping').catch(()=>cleanup(s,true,'ipc_failed'));},3000);
+   s.heartbeat=setInterval(()=>{if(performance.now()-s.lastPong>20000){cleanup(s,true,'sidecar_unavailable');return;}send(s,'alec_native_live_ping',{playing:s.playing.size>0||s.pending.length>0}).catch(()=>cleanup(s,true,'ipc_failed'));},3000);
    s.playbackTimer=setInterval(()=>drain(s),50);capture(s);return;
   }
   const s=active;if(!s||s.id!==event.session)return;

@@ -130,3 +130,14 @@ test('Live core tasks acknowledge immediately, retain typed args and query autho
  const t=a.call({id:'task',name:'alec_start_task',args:{operation:'core_tool',tool:'open',args_json:'{"target":"Photoshop"}'}});assert.equal(t.state,'queued');await tick();finish({ok:true});await tick();
  assert.equal(a.call({id:'status',name:'alec_task_status',args:{task_id:t.task_id}}).state,'complete');}finally{a.close();}
 });
+
+test('Live denies discovery and memory when grant is revoked and allows explicitly repeated finished core requests',async()=>{
+ let allowed=true,invoked=0;const seen=[];const a=createLiveActions({authorize:()=>allowed,execute:async()=>{invoked++;return {ok:true};},catalog:()=>({tools:['open']}),memory:()=>({available:true,context:'approved'}),onResultRead:id=>seen.push(id)});
+ try{
+ const args={operation:'core_tool',tool:'open',args_json:'{"target":"Photoshop"}'};
+ const first=a.call({id:'first',name:'alec_start_task',args});await tick();await tick();
+ const status=a.call({id:'check',name:'alec_task_status',args:{task_id:first.task_id}});assert.equal(status.state,'complete');assert.deepEqual(seen,[first.task_id]);
+ const second=a.call({id:'second',name:'alec_start_task',args});assert.notEqual(first.task_id,second.task_id);await tick();await tick();assert.equal(invoked,2);
+ allowed=false;assert.equal(a.call({id:'catalog',name:'alec_core_catalog',args:{}}).error,'not_authorized');assert.equal(a.call({id:'memory',name:'alec_core_memory',args:{query:'project'}}).error,'not_authorized');
+ }finally{a.close();}
+});
