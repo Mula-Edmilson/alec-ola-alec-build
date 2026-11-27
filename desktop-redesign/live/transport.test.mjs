@@ -89,3 +89,19 @@ test('Live task policy denies unknown or unapproved actions; cancellation and re
   allowed=false;assert.equal(actions.call({id:'check',name:'alec_task_status',args:{task_id:t.task_id}}).error,'permission_revoked');
  }finally{actions.close();}
 });
+
+test('replayed Live calls return current state and never expose results after permission revocation',async()=>{
+ let allowed=true,count=0;
+ const actions=createLiveActions({authorize:()=>allowed,execute:async()=>{count++;return {ram:42};}});
+ const start={id:'start-replay',name:'alec_start_task',args:{operation:'system_status'}};
+ try{
+  const initial=actions.call(start);assert.equal(initial.state,'queued');
+  await tick();await tick();
+  const replay=actions.call(start);assert.equal(replay.state,'complete');assert.equal(replay.duplicate,true);assert.equal(count,1);
+  const status={id:'status-replay',name:'alec_task_status',args:{task_id:initial.task_id}};
+  assert.equal(actions.call(status).result.ram,42);
+  allowed=false;
+  const denied=actions.call(status);assert.equal(denied.error,'permission_revoked');assert.equal(denied.result,undefined);
+  assert.equal(actions.call(start).error,'permission_revoked');assert.equal(count,1);
+ }finally{actions.close();}
+});
