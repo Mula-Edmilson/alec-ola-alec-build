@@ -32,3 +32,24 @@ test('browser action grants are one-shot and scoped to authenticated local sessi
  await a.handle({type:'alec_agents_confirm',sessionId,id});assert.equal(events.length,1);
  await a.handle({type:'alec_agents_close'});assert.equal(a.snapshot().session,null);
 });
+
+test('model plans are imported only, bound to session scope and individually reviewed',async t=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'alec-plan-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));
+ await fs.writeFile(path.join(root,'a.js'),'one');
+ const trust=createTrust(),a=createNativeAgents({trust,origin});
+ await a.handle({type:'alec_agents_open',kind:'developer',root});
+ const sessionId=a.snapshot().session.id;
+ const imp=steps=>a.handle({type:'alec_agents_import_plan',sessionId,value:JSON.stringify({kind:'developer',scope:'ignored',steps})});
+ await imp([{action:'read',target:'../outside'}]);assert.ok(a.snapshot().error);assert.equal(a.snapshot().plan,null);
+ await imp([{action:'read',target:'a.js',value:'hidden'}]);assert.ok(a.snapshot().error);
+ await imp([{action:'proposePatch',target:'a.js'},{action:'applyPatch',target:'a.js'}]);
+ assert.equal(a.snapshot().plan.index,0);assert.equal(a.snapshot().staged,null);assert.equal(trust.list().length,0);
+ await a.handle({type:'alec_agents_stage_plan',sessionId,value:'two'});
+ const first=a.snapshot().staged.id;assert.equal(await fs.readFile(path.join(root,'a.js'),'utf8'),'one');
+ await a.handle({type:'alec_agents_confirm',sessionId,id:first});assert.equal(a.snapshot().plan.index,1);
+ await a.handle({type:'alec_agents_stage_plan',sessionId});
+ assert.equal(a.snapshot().staged.review.after,'two');assert.equal(await fs.readFile(path.join(root,'a.js'),'utf8'),'one');
+ await a.handle({type:'alec_agents_confirm',sessionId,id:a.snapshot().staged.id});
+ assert.equal(a.snapshot().plan.index,2);assert.equal(await fs.readFile(path.join(root,'a.js'),'utf8'),'two');assert.equal(trust.list().length,0);
+ await a.handle({type:'alec_agents_close'});
+});
