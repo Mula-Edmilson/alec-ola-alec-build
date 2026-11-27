@@ -1,5 +1,5 @@
 # ALEC 0.3.4 — Browser Agent & Developer Agent
-## Functional development candidate (not integrated into the public installer)
+## Functional development candidate (native panel source integrated; not in public installer)
 The original supervised coordinator, browser adapter, developer adapter and interactive local runner are in this directory. They do not start an AI model or automatically generate plans. The previous 0.3.3 release remains unchanged. Browser Use and Brahma Echo are references only; the first implementation uses Playwright with a local Edge browser to avoid a second bundled browser download.
 
 ## Run locally for development
@@ -19,4 +19,13 @@ Run `node executar-agentes.mjs plan.json`. Select the workspace and relative Nod
 - Browser: fresh context, scripts disabled, exact approved HTTPS origin, blocked redirects (including same-origin), cross-origin resources, WebSockets and downloads. No login credentials or existing session reuse. Suitable for basic HTML pages and forms, not full JS-heavy websites. The origin restriction is not network-level isolation or protection against DNS rebinding; use trusted domains only. Even GET requests can have server-side effects.
 - Developer: scope is an explicit project directory, rejects traversal, links/junctions, selected secret paths and large/non-text files. Edits are whole-file reviewed replacements, with SHA-256 stale-content checks and one-shot proposal ID. This is not an OS sandbox and cannot guarantee against a malicious concurrent filesystem mutation or secrets under arbitrary names. Use trusted projects only. Node tests execute project code with the user's OS permissions; child-process cancellation is best effort, not a process-tree sandbox. No arbitrary shell command or Git push/deploy.
 - Approval is bound to task/step, expires after 60 seconds, consumed once. Browser form submission and file writes require approval; no LLM/page output may grant authorization. No personal data sent to an LLM by this runner.
-- Next integration: native panel, authenticated Trust Engine grants, model-generated plan review, actual browser lifecycle and dependency packaging, installed Windows runtime and full regression tests. Public release stays at 0.3.3 until those are validated.
+- Native panel source now integrates local-only authenticated commands and temporary Trust Engine grants, staged operations, review and cancellation. Use the Skills area. The Ask button drafts a plan request for the selected model; it does not automatically transfer model output or private results into execution. Native source transformation and installed Windows runtime still require CI validation. Public release stays at 0.3.3 until validated.
+
+## Native browser dependency (manual installation)
+For development only, run in PowerShell with Node.js/npm installed:
+```powershell
+$dir = Join-Path $env:LOCALAPPDATA 'ALEC\agent-runtime'
+New-Item -ItemType Directory -Force $dir | Out-Null
+npm.cmd install --prefix "$dir" --no-save --package-lock=false --ignore-scripts playwright@1.65.1
+```
+No browser download is needed for this mode; existing Microsoft Edge is required. Native dependency packaging and actual installed-runtime support remain unverified. No automatic module installation or execution of model-generated plans. Sessions expire after 15 minutes; per-step approval expires after 60 seconds. Test only trusted projects and domains.
