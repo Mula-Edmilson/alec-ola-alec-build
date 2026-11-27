@@ -5,7 +5,7 @@ on:
     branches: [main]
     types: [opened, synchronize, reopened]
   push:
-    branches: [alec-desktop-redesign, alec-proactive-v7, alec-qr-v7.1, alec-qr-v7.2, alec-vision-v8, alec-signed-updater, alec-browser-developer, alec-panel-polish, alec-conversation-engine]
+    branches: [alec-desktop-redesign, alec-proactive-v7, alec-qr-v7.1, alec-qr-v7.2, alec-vision-v8, alec-signed-updater, alec-browser-developer, alec-panel-polish, alec-conversation-engine, alec-live-engine]
     paths:
       - '.github/workflows/alec-desktop-windows.yml'
       - 'desktop-redesign/native/**'
@@ -53,7 +53,8 @@ jobs:
           node desktop-redesign/native/preparar-fonte.mjs upstream --public
           node desktop-redesign/native/verificar-paridade.mjs upstream
           node --test desktop-redesign/native/test-alec-orb-evolution.mjs desktop-redesign/native/test-alec-adaptive-memory.mjs desktop-redesign/native/test-alec-universal.mjs desktop-redesign/native/test-alec-agent-plans.mjs desktop-redesign/native/test-alec-developer-adapter.mjs desktop-redesign/native/test-alec-native-agents.mjs
-          node --test desktop-redesign/native/test-alec-conversation.mjs
+          node --test desktop-redesign/native/test-alec-conversation.mjs desktop-redesign/native/test-alec-live-host.mjs
+          node --test desktop-redesign/live/transport.test.mjs
           node --test desktop-redesign/native/test-alec-proactive.mjs
           node desktop-redesign/native/testar-tailnet.mjs
           node desktop-redesign/native/testar-voz-alec.mjs
@@ -120,7 +121,7 @@ jobs:
             upstream/showcase/tauri/src-tauri/hands-win -> target
           key: alec-windows-v7-icon
       - name: Native Windows voice session regression tests
-        if: github.ref_name == 'alec-conversation-engine'
+        if: github.ref_name == 'alec-conversation-engine' || github.ref_name == 'alec-live-engine'
         shell: bash
         run: cargo test --locked --manifest-path upstream/showcase/tauri/src-tauri/voice-win/Cargo.toml --bin roamies-voice
       - name: Install Tauri CLI
@@ -291,7 +292,7 @@ jobs:
         run: |
           git -C upstream diff --binary HEAD > candidate/ALEC-source.patch
           mkdir -p candidate/new-source
-          git -C upstream ls-files --others --exclude-standard -- showcase/tauri/sidecar/alec-qr-runtime.mjs showcase/tauri/sidecar/alec-qrcode.cjs showcase/tauri/sidecar/alec-local-context.mjs showcase/tauri/sidecar/alec-voice-preference.mjs showcase/tauri/sidecar/alec-legacy-profile.mjs showcase/tauri/sidecar/alec-skill-hub.mjs showcase/tauri/sidecar/alec-bridge-supervisor.mjs showcase/panel/alec-theme.css showcase/tauri/sidecar/alec-wake-phrase.mjs showcase/tauri/sidecar/test/alec-wake-phrase.test.mjs showcase/tauri/sidecar/alec-sigma-vision.mjs showcase/tauri/sidecar/alec-sigma-supervisor.mjs showcase/tauri/sidecar/alec-update.mjs showcase/tauri/sidecar/alec-trust.mjs showcase/tauri/sidecar/alec-learn.mjs showcase/tauri/sidecar/alec-cloud.mjs showcase/tauri/sidecar/alec-cloud-local.mjs showcase/tauri/sidecar/alec-evolution.mjs showcase/tauri/sidecar/alec-adaptive-memory.mjs showcase/tauri/sidecar/alec-proactive.mjs showcase/tauri/sidecar/alec-universal.mjs showcase/tauri/sidecar/alec-agent-plans.mjs showcase/tauri/sidecar/alec-browser-adapter.mjs showcase/tauri/sidecar/alec-developer-adapter.mjs showcase/tauri/sidecar/alec-native-agents.mjs showcase/tauri/sidecar/alec-conversation.mjs showcase/tauri/src-tauri/voice-win/src/alec_conversation.rs | while IFS= read -r f; do
+          git -C upstream ls-files --others --exclude-standard -- showcase/tauri/sidecar/alec-qr-runtime.mjs showcase/tauri/sidecar/alec-qrcode.cjs showcase/tauri/sidecar/alec-local-context.mjs showcase/tauri/sidecar/alec-voice-preference.mjs showcase/tauri/sidecar/alec-legacy-profile.mjs showcase/tauri/sidecar/alec-skill-hub.mjs showcase/tauri/sidecar/alec-bridge-supervisor.mjs showcase/panel/alec-theme.css showcase/tauri/sidecar/alec-wake-phrase.mjs showcase/tauri/sidecar/test/alec-wake-phrase.test.mjs showcase/tauri/sidecar/alec-sigma-vision.mjs showcase/tauri/sidecar/alec-sigma-supervisor.mjs showcase/tauri/sidecar/alec-update.mjs showcase/tauri/sidecar/alec-trust.mjs showcase/tauri/sidecar/alec-learn.mjs showcase/tauri/sidecar/alec-cloud.mjs showcase/tauri/sidecar/alec-cloud-local.mjs showcase/tauri/sidecar/alec-evolution.mjs showcase/tauri/sidecar/alec-adaptive-memory.mjs showcase/tauri/sidecar/alec-proactive.mjs showcase/tauri/sidecar/alec-universal.mjs showcase/tauri/sidecar/alec-agent-plans.mjs showcase/tauri/sidecar/alec-browser-adapter.mjs showcase/tauri/sidecar/alec-developer-adapter.mjs showcase/tauri/sidecar/alec-native-agents.mjs showcase/tauri/sidecar/alec-conversation.mjs showcase/tauri/sidecar/alec-live-host.mjs showcase/tauri/sidecar/alec-live-transport.mjs showcase/tauri/sidecar/alec-live-assets.mjs showcase/tauri/src-tauri/voice-win/src/alec_conversation.rs | while IFS= read -r f; do
             mkdir -p "candidate/new-source/$(dirname "$f")"
             cp "upstream/$f" "candidate/new-source/$f"
           done

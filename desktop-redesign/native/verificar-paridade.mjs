@@ -38,6 +38,7 @@ newAllowed.add('showcase/tauri/sidecar/alec-proactive.mjs');
 newAllowed.add('showcase/tauri/sidecar/alec-universal.mjs');
 for(const n of ['alec-agent-plans.mjs','alec-browser-adapter.mjs','alec-developer-adapter.mjs','alec-native-agents.mjs'])newAllowed.add('showcase/tauri/sidecar/'+n);
 newAllowed.add('showcase/tauri/sidecar/alec-conversation.mjs');
+for(const n of ['alec-live-host.mjs','alec-live-transport.mjs','alec-live-assets.mjs'])newAllowed.add('showcase/tauri/sidecar/'+n);
 newAllowed.add('showcase/tauri/src-tauri/voice-win/src/alec_conversation.rs');
 for(const f of git('ls-files','--others','--exclude-standard').trim().split('\n').filter(Boolean))assert.ok(newAllowed.has(f),'Unexpected added source: '+f);
 const before=f=>git('show','HEAD:'+f).replace(/\r\n/g,'\n');
@@ -127,3 +128,6 @@ assert.equal(updaterConfig.bundle.createUpdaterArtifacts,!!updaterConfig.plugins
 assert.ok(shell.indexOf('#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]')>=0&&shell.indexOf('#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]')<shell.indexOf('const ALEC_SIGNED_UPDATE: bool'),'Rust crate attribute must precede updater declaration');
 assert.ok(shell.includes('update.download_and_install')&&shell.includes('update.version!=expected')&&shell.includes('!ALEC_SIGNED_UPDATE'),'Native signed installer gate');
 console.log('Parity source gate OK: '+protectedPaths.length+' original tracked paths protected; all native script references preserved. Runtime behavior still requires tests.');
+
+assert.equal(after(core+'alec-live-host.mjs'),readFileSync(new URL('./alec-live-host.mjs',import.meta.url),'utf8').replace(/\r\n/g,'\n'),'Live host module integrity mismatch');
+assert.ok(source.includes('!alecLiveLocked && VOICE_OK'),'Native microphone lock missing');
