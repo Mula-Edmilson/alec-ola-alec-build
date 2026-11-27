@@ -13,6 +13,11 @@
         "kind": "improved",
         "title": "Recuperação Live",
         "text": "Retoma Gemini, compressão de contexto e reconexão limitada, mantendo a Orb durante a recuperação."
+      },
+      {
+        "kind": "improved",
+        "title": "Diagnóstico e recuperação",
+        "text": "Tentativas limitadas, aviso de contexto perdido, renovação antecipada e motivo de encerramento visível na Orb. Registos técnicos sem áudio nem credenciais."
       }
     ]
   },

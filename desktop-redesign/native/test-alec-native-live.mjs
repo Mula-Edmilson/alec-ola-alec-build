@@ -4,10 +4,10 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 const source=readFileSync(new URL('./alec-native-live.js',import.meta.url),'utf8');
 test('actual native renderer captures only after activation, plays and interrupts audio, cleans mic on stop',async()=>{
- const calls=[],visual={},tracks=[],playing=[];let worklet,closed=0,pinned=0,released=0,audioCtx;
+ const calls=[],visual={},tracks=[],playing=[],notices=[];let worklet,closed=0,pinned=0,released=0,audioCtx;
  const fakeNode=()=>({connect(){},disconnect(){}});
- const track={stop(){tracks.push('stopped');},addEventListener(){}};
- const R={alecLivePin:()=>pinned++,alecLiveRelease:()=>released++};
+ const track={stop(){tracks.push('stopped');},addEventListener(){},getSettings(){return {echoCancellation:true};}};
+ const R={alecLivePin:()=>pinned++,alecLiveRelease:()=>released++,alecLiveStatus:reason=>notices.push(reason)};
  const ctx={
   window:{Roamie:R,__TAURI__:{core:{invoke:async(name,args)=>{calls.push({name,...args.msg});}}}},
   location:{href:'http://tauri.localhost/desktop.html'},navigator:{mediaDevices:{getUserMedia:async()=>({getTracks:()=>[track],getAudioTracks:()=>[track]})}},
@@ -20,7 +20,7 @@ test('actual native renderer captures only after activation, plays and interrupt
  vm.runInNewContext(source,ctx);
  assert.equal(calls.length,0);const event=(type,data={})=>ctx.window.__alecNativeLive({session:'session-A',type,...data});
  try{
- event('start');await new Promise(r=>setImmediate(r));assert.equal(pinned,1);assert.equal(calls.at(-1).type,'alec_native_live_ready');
+ event('start');await new Promise(r=>setImmediate(r));assert.equal(pinned,1);assert.equal(calls.at(-1).type,'alec_native_live_ready');assert.equal(calls.at(-1).echo,true);
  worklet.port.onmessage({data:new ArrayBuffer(2560)});assert.equal(calls.filter(x=>x.type==='alec_native_live_audio').length,0);
  event('ready');worklet.port.onmessage({data:new ArrayBuffer(2560)});await new Promise(r=>setImmediate(r));assert.equal(calls.at(-1).type,'alec_native_live_audio');assert.equal(calls.at(-1).pcm.length,3416);
  event('audio',{pcm:'AAAAAA=='});assert.deepEqual(playing,['start']);
@@ -33,9 +33,9 @@ test('actual native renderer captures only after activation, plays and interrupt
  audioCtx.currentTime=10;
  event('audio',{pcm:'AAAAAA=='});assert.ok(playing.filter(x=>x==='start').length>before);
  event('reconnecting');assert.equal(released,0);worklet.port.onmessage({data:new ArrayBuffer(2560)});
- event('ready');event('interrupt');assert.equal(tracks.length,0);
+ event('ready');event('context_reset');assert.deepEqual(notices,['context_reset']);event('interrupt');assert.equal(tracks.length,0);
  ctx.window.__alecNativeLive({session:'stale',type:'closed'});assert.equal(tracks.length,0);
- event('closed');assert.equal(tracks.length,1);assert.equal(closed,1);assert.equal(released,1);assert.equal(R.alecNativeLiveSession,null);
+ event('closed',{reason:'policy_or_quota'});assert.deepEqual(notices,['context_reset','policy_or_quota']);assert.equal(tracks.length,1);assert.equal(closed,1);assert.equal(released,1);assert.equal(R.alecNativeLiveSession,null);
  }finally{R.alecNativeLiveStop();}
 });
 test('desktop controller does not use browser navigation or a local web server',()=>{

@@ -27,3 +27,28 @@ test('native reconnect retains session handle, hides checkpoint, and supports ex
  }finally{s.close();}
  assert.equal(s.state,'closed');assert.equal(events.at(-1).reason,'stopped');
 });
+
+test('initial transient failure recovers; repeated short-lived connections stop after three retries',async()=>{
+ const sockets=[],events=[];const s=createResilientLiveSession({apiKey:'x',model:'gemini-live',retryDelay:1,stableMs:60000,socket:()=>{const f=new Fake();sockets.push(f);return f;},emit:e=>events.push(e)});
+ const wait=()=>new Promise(r=>setTimeout(r,25));
+ try{
+  sockets[0].dispatchEvent(new Event('close'));await wait();assert.equal(sockets.length,2);
+  for(let i=1;i<=3;i++){
+   sockets[i].message({setupComplete:{}});await tick();assert.equal(s.state,'ready');
+   sockets[i].dispatchEvent(new Event('close'));await wait();
+  }
+  assert.equal(sockets.length,4);assert.equal(s.state,'closed');assert.equal(events.at(-1).reason,'connection_closed');
+  assert.equal(events.filter(e=>e.type==='reconnecting').length,3);
+  assert.equal(events.filter(e=>e.type==='context_reset').length,2);
+ }finally{s.close();}
+});
+test('idle goAway renews before disconnect; policy close is not retried even after generic error',async()=>{
+ const sockets=[],events=[];const s=createResilientLiveSession({apiKey:'x',model:'gemini-live',retryDelay:1,socket:()=>{const f=new Fake();sockets.push(f);return f;},emit:e=>events.push(e)});
+ try{
+  sockets[0].message({setupComplete:{}});sockets[0].message({sessionResumptionUpdate:{resumable:true,newHandle:'keep'}});sockets[0].message({goAway:{timeLeft:'1s'}});await tick();await new Promise(r=>setTimeout(r,25));
+  assert.equal(sockets.length,2);sockets[1].dispatchEvent(new Event('open'));assert.equal(sockets[1].sent[0].setup.sessionResumption.handle,'keep');
+  sockets[1].message({setupComplete:{}});await tick();
+  sockets[1].dispatchEvent(new Event('error'));const close=new Event('close');Object.defineProperty(close,'code',{value:1008});sockets[1].dispatchEvent(close);await tick();
+  assert.equal(s.state,'closed');assert.equal(events.at(-1).reason,'policy_or_quota');assert.equal(sockets.length,2);
+ }finally{s.close();}
+});
