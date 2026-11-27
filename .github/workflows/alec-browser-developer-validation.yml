@@ -33,7 +33,7 @@ jobs:
       - name: Verify existing universal AI and trust policy
         run: node --test desktop-redesign/native/test-alec-universal.mjs desktop-redesign/native/test-alec-trust.mjs
   browser:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -46,7 +46,7 @@ jobs:
         working-directory: desktop-redesign/native
         run: |
           npm install --no-save --package-lock=false --ignore-scripts playwright@1.65.1
-          npx --no-install playwright install --with-deps chromium
+          npx --no-install playwright install chromium
       - name: Create disposable TLS fixture and run real browser tests
         shell: bash
         run: |
