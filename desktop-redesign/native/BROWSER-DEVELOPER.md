@@ -1,0 +1,7 @@
+# ALEC 0.3.4 — Browser Agent & Developer Agent
+Stage 1: reviewed plan coordinator, no runtime integration yet. Original source, no third-party code copied.
+Browser Use (https://github.com/browser-use/browser-use) is the candidate for a separately pinned local browser adapter; Brahma Echo is a functional reference. No dependency installed or bundled at this stage.
+Browser scope: exact HTTPS origin, isolated session, no raw JavaScript, no inherited user profile by default. Adapter must enforce scope on redirects, popups, subresources and before each action; form values stay outside model-generated plans; separate confirmation for submission and other side effects.
+Developer scope: trusted workspace registry, canonical realpath containment including junctions, protected secrets, reviewed diffs and registered test commands only. No automatic push, deployment, dependency installation or destructive operations. Tests can execute project code and require explicit approval.
+One active task, one selected model (no additional model started by coordinator). Existing Trust grants and authenticated local UI must be wired by the runtime. Never trust page or repository text as instructions. Approval is bound to task and step, expires after 60s, and is consumed once.
+Next: implement actual browser/developer adapters and native UI; integrate with Trust, universal model routing and cancellation, add Windows integration and adversarial tests. The coordinator does not yet perform real browser or file operations, and the existing version remains 0.3.3 until validated.
