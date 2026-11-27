@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
-    if: github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && (github.head_ref == 'alec-desktop-redesign' || github.head_ref == 'alec-proactive-v7' || github.head_ref == 'alec-qr-v7.1'))
+    if: github.ref_name != 'alec-panel-polish' && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && (github.head_ref == 'alec-desktop-redesign' || github.head_ref == 'alec-proactive-v7' || github.head_ref == 'alec-qr-v7.1')))
     runs-on: windows-latest
     timeout-minutes: 90
     environment: ${{ github.event_name == 'push' && github.ref_name == 'alec-signed-updater' && 'alec-signing' || 'alec-candidate' }}
@@ -284,4 +284,41 @@ jobs:
           name: ALEC-Desktop-Preview-Windows-x64-candidate
           path: candidate/
           if-no-files-found: error
+          retention-days: 30
+
+  visual-review:
+    if: github.ref_name == 'alec-panel-polish'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Transform exact native source and check parity
+        shell: bash
+        run: |
+          git clone --branch v0.1.51 --depth 1 https://github.com/KenKaiii/Roamies.git upstream
+          test "$(git -C upstream rev-parse HEAD)" = "362645466349f4c520ad453d94a94c2481776c2f"
+          node desktop-redesign/native/preparar-fonte.mjs upstream --public
+          node desktop-redesign/native/verificar-paridade.mjs upstream
+          node --check upstream/showcase/panel/panel.js
+      - name: Verify panel geometry and capture Edge screenshots
+        shell: bash
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+        run: |
+          mkdir -p desktop-redesign/native/.visual-runtime
+          cp desktop-redesign/native/agent-runtime-package.json desktop-redesign/native/.visual-runtime/package.json
+          npm install --prefix desktop-redesign/native/.visual-runtime --omit=dev --ignore-scripts --no-audit --no-fund
+          node desktop-redesign/native/testar-layout-painel.mjs upstream/showcase visual-evidence
+      - name: Upload evidence for visual review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ALEC-panel-layout-evidence
+          path: visual-evidence/
+          if-no-files-found: warn
           retention-days: 30
