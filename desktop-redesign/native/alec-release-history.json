@@ -1,5 +1,22 @@
 [
   {
+    "version": "0.4.1",
+    "title": "Unified Intelligence",
+    "date": null,
+    "items": [
+      {
+        "kind": "new",
+        "title": "Executor ALEC real",
+        "text": "Catálogo das ferramentas nativas, esquemas e execução na fila Live com confirmação local."
+      },
+      {
+        "kind": "fixed",
+        "title": "Personalidade e atalhos",
+        "text": "Personalidade adaptativa no Live, pausas mais pacientes e Ask por texto na sessão actual."
+      }
+    ]
+  },
+  {
     "version": "0.4.0",
     "title": "Live Intelligence",
     "date": null,

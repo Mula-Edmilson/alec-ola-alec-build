@@ -9,6 +9,7 @@ on:
     paths:
       - '.github/workflows/alec-desktop-windows.yml'
       - 'desktop-redesign/native/**'
+      - 'desktop-redesign/live/**'
 permissions:
   contents: read
 concurrency:

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createLiveSession,createResilientLiveSession,createLiveActions} from './transport.mjs';
+import {createLiveSession,createResilientLiveSession,createLiveActions,createLiveCore,liveInstruction} from './transport.mjs';
 class Fake extends EventTarget{readyState=1;bufferedAmount=0;sent=[];send(s){this.sent.push(JSON.parse(s));}close(){this.readyState=3;}message(data){this.dispatchEvent(new MessageEvent('message',{data:JSON.stringify(data)}));}}
 const tick=()=>new Promise(r=>setImmediate(r));
 test('setup gates microphone, sends PCM16, streams audio and flush signal, then closes',async()=>{
@@ -58,7 +58,7 @@ test('Live tasks acknowledge immediately while work is pending; audio and reconn
  const actions=createLiveActions({authorize:()=>true,execute:async args=>{work.push(args);return new Promise(r=>{complete=r;});}});
  const s=createResilientLiveSession({apiKey:'x',model:'gemini-live',retryDelay:1,actions,socket:()=>{const f=new Fake();sockets.push(f);return f;},emit:e=>events.push(e)});
  try{
-  const ws=sockets[0];ws.dispatchEvent(new Event('open'));assert.equal(ws.sent[0].setup.tools[0].functionDeclarations.length,3);
+  const ws=sockets[0];ws.dispatchEvent(new Event('open'));assert.equal(ws.sent[0].setup.tools[0].functionDeclarations.length,5);
   ws.message({setupComplete:{}});await tick();
   const fc={id:'task1',name:'alec_start_task',args:{operation:'system_status'}};
   ws.message({toolCall:{functionCalls:[fc]}});await tick();await tick();
@@ -104,4 +104,29 @@ test('replayed Live calls return current state and never expose results after pe
   const denied=actions.call(status);assert.equal(denied.error,'permission_revoked');assert.equal(denied.result,undefined);
   assert.equal(actions.call(start).error,'permission_revoked');assert.equal(count,1);
  }finally{actions.close();}
+});
+
+test('Unified Live routes a typed Ask to the same socket and uses the configured personality',async()=>{
+ const ws=new Fake();const session=createLiveSession({apiKey:'x',model:'gemini-live',persona:'ALEC PERSONALITY MARKER',socket:()=>ws});
+ try{assert.equal(session.text('Olá'),false);ws.dispatchEvent(new Event('open'));
+ assert.match(ws.sent[0].setup.systemInstruction.parts[0].text,/ALEC PERSONALITY MARKER/);
+ assert.equal(ws.sent[0].setup.realtimeInputConfig.automaticActivityDetection.silenceDurationMs,1150);
+ ws.message({setupComplete:{}});await tick();assert.equal(session.text('Abre o meu projecto'),true);
+ assert.equal(ws.sent.at(-1).realtimeInput.text,'Abre o meu projecto');}finally{session.close();}
+});
+test('Unified core catalog and execution use the actual registered object, with schema, approval, and policy',async()=>{
+ const invoked=[];let approved=false,allow=true,seen;
+ const tool={name:'open',description:'Open any supported target',rawInputSchema:{type:'object'},parameters:{safeParse:a=>typeof a.target==='string'?{success:true,data:a}:{success:false}},execute:async(a,ctx)=>{invoked.push(a);assert.ok(ctx.signal);return 'Opened '+a.target;}};
+ const core=createLiveCore({registry:()=>[tool,{...tool,name:'unregistered_admin'}],actionsAllowed:()=>allow,confirm:async x=>{seen=x;return approved;}});
+ const signal=new AbortController().signal;
+ assert.equal(core.catalog().tools[0].name,'open');assert.equal(core.catalog('unregistered_admin').error,'tool_unavailable');
+ await assert.rejects(core.execute('open',{target:'Photoshop'},signal,'x'),/not_approved/);
+ approved=true;assert.equal((await core.execute('open',{target:'Photoshop'},signal,'x')).output,'Opened Photoshop');assert.equal(invoked.length,1);assert.match(seen.args,/Photoshop/);
+ allow=false;await assert.rejects(core.execute('open',{target:'Chrome'},signal,'y'),/native_actions_disabled/);assert.equal(invoked.length,1);
+});
+test('Live core tasks acknowledge immediately, retain typed args and query authorized memory',async()=>{
+ let finish;const a=createLiveActions({authorize:()=>true,execute:async args=>{assert.equal(args.tool,'open');assert.equal(args.args.target,'Photoshop');return new Promise(r=>finish=r);},catalog:()=>({tools:[{name:'open'}]}),memory:()=>({available:true,context:'approved'} )});
+ try{assert.equal(a.call({id:'list',name:'alec_core_catalog',args:{}}).tools[0].name,'open');assert.equal(a.call({id:'mem',name:'alec_core_memory',args:{query:'project'}}).context,'approved');
+ const t=a.call({id:'task',name:'alec_start_task',args:{operation:'core_tool',tool:'open',args_json:'{"target":"Photoshop"}'}});assert.equal(t.state,'queued');await tick();finish({ok:true});await tick();
+ assert.equal(a.call({id:'status',name:'alec_task_status',args:{task_id:t.task_id}}).state,'complete');}finally{a.close();}
 });
