@@ -36,6 +36,7 @@ for(const n of ['alec-cloud.mjs','alec-cloud-local.mjs','alec-evolution.mjs'])ne
 newAllowed.add('showcase/tauri/sidecar/alec-adaptive-memory.mjs');
 newAllowed.add('showcase/tauri/sidecar/alec-proactive.mjs');
 newAllowed.add('showcase/tauri/sidecar/alec-universal.mjs');
+for(const n of ['alec-agent-plans.mjs','alec-browser-adapter.mjs','alec-developer-adapter.mjs','alec-native-agents.mjs'])newAllowed.add('showcase/tauri/sidecar/'+n);
 for(const f of git('ls-files','--others','--exclude-standard').trim().split('\n').filter(Boolean))assert.ok(newAllowed.has(f),'Unexpected added source: '+f);
 const before=f=>git('show','HEAD:'+f).replace(/\r\n/g,'\n');
 const after=f=>readFileSync(path.join(root,f),'utf8').replace(/\r\n/g,'\n');
@@ -47,6 +48,10 @@ assert.ok(protectedPaths.length>30,'Native module inventory incomplete');
 const tools=after(core+'tools.mjs');
 for(const n of ['draw','take_screenshot','read_window','act_in_app','pointer_drag','read_file','list_files','search_files','write_file','run_command','open','use_skill','install_skill','schedule_job','remember_commitment'])assert.ok(tools.includes("name: '"+n+"'"),'Missing native tool: '+n);
 const source=after(core+'sidekick.mjs');
+for(const n of ['alec-agent-plans.mjs','alec-browser-adapter.mjs','alec-developer-adapter.mjs','alec-native-agents.mjs'])assert.equal(after(core+n),readFileSync(new URL('./'+n,import.meta.url),'utf8').replace(/\r\n/g,'\n'),'Agent module integrity mismatch: '+n);
+assert.ok(source.includes('alecNativeAgents.handle(m)')&&source.includes('alecAgents:alecNativeAgents.snapshot()'),'Native agent integration missing');
+assert.ok(after('showcase/tauri/src-tauri/src/main.rs').includes('t.starts_with("alec_agents_")'),'Missing local panel authentication');
+assert.ok(after('showcase/panel/panel.js').includes('alecAgentsCard()'),'Agent panel missing');
 assert.equal(after(core+'alec-universal.mjs'),readFileSync(new URL('./alec-universal.mjs',import.meta.url),'utf8').replace(/\r\n/g,'\n'),'Universal module integrity mismatch');
 assert.ok(source.includes('verifyFreeModel(s,raw)')&&source.includes('if(singleMode(config)){turnNamed=null;routeBack();return null;}'),'Free model verification and exclusive route missing');
 assert.equal(after(core+'alec-proactive.mjs'),readFileSync(new URL('./alec-proactive.mjs',import.meta.url),'utf8').replace(/\r\n/g,'\n'),'Proactive module integrity mismatch');
