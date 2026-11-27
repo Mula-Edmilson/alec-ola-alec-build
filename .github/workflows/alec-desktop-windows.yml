@@ -51,7 +51,7 @@ jobs:
         run: |
           node desktop-redesign/native/preparar-fonte.mjs upstream --public
           node desktop-redesign/native/verificar-paridade.mjs upstream
-          node --test desktop-redesign/native/test-alec-orb-evolution.mjs
+          node --test desktop-redesign/native/test-alec-orb-evolution.mjs desktop-redesign/native/test-alec-adaptive-memory.mjs
           node desktop-redesign/native/testar-tailnet.mjs
           node desktop-redesign/native/testar-voz-alec.mjs
           node desktop-redesign/native/testar-contexto-local.mjs
@@ -238,7 +238,7 @@ jobs:
         run: |
           git -C upstream diff --binary HEAD > candidate/ALEC-source.patch
           mkdir -p candidate/new-source
-          git -C upstream ls-files --others --exclude-standard -- showcase/tauri/sidecar/alec-qr-runtime.mjs showcase/tauri/sidecar/alec-qrcode.cjs showcase/tauri/sidecar/alec-local-context.mjs showcase/tauri/sidecar/alec-voice-preference.mjs showcase/tauri/sidecar/alec-legacy-profile.mjs showcase/tauri/sidecar/alec-skill-hub.mjs showcase/tauri/sidecar/alec-bridge-supervisor.mjs showcase/panel/alec-theme.css showcase/tauri/sidecar/alec-wake-phrase.mjs showcase/tauri/sidecar/test/alec-wake-phrase.test.mjs showcase/tauri/sidecar/alec-sigma-vision.mjs showcase/tauri/sidecar/alec-sigma-supervisor.mjs showcase/tauri/sidecar/alec-update.mjs showcase/tauri/sidecar/alec-trust.mjs showcase/tauri/sidecar/alec-learn.mjs showcase/tauri/sidecar/alec-cloud.mjs showcase/tauri/sidecar/alec-cloud-local.mjs showcase/tauri/sidecar/alec-evolution.mjs | while IFS= read -r f; do
+          git -C upstream ls-files --others --exclude-standard -- showcase/tauri/sidecar/alec-qr-runtime.mjs showcase/tauri/sidecar/alec-qrcode.cjs showcase/tauri/sidecar/alec-local-context.mjs showcase/tauri/sidecar/alec-voice-preference.mjs showcase/tauri/sidecar/alec-legacy-profile.mjs showcase/tauri/sidecar/alec-skill-hub.mjs showcase/tauri/sidecar/alec-bridge-supervisor.mjs showcase/panel/alec-theme.css showcase/tauri/sidecar/alec-wake-phrase.mjs showcase/tauri/sidecar/test/alec-wake-phrase.test.mjs showcase/tauri/sidecar/alec-sigma-vision.mjs showcase/tauri/sidecar/alec-sigma-supervisor.mjs showcase/tauri/sidecar/alec-update.mjs showcase/tauri/sidecar/alec-trust.mjs showcase/tauri/sidecar/alec-learn.mjs showcase/tauri/sidecar/alec-cloud.mjs showcase/tauri/sidecar/alec-cloud-local.mjs showcase/tauri/sidecar/alec-evolution.mjs showcase/tauri/sidecar/alec-adaptive-memory.mjs | while IFS= read -r f; do
             mkdir -p "candidate/new-source/$(dirname "$f")"
             cp "upstream/$f" "candidate/new-source/$f"
           done

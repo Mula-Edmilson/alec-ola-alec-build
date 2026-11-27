@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {createMemory,explicitMemory} from './alec-adaptive-memory.mjs';
+function lab(fn){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'alec-mem-'));try{fn(path.join(dir,'memory.json'));}finally{fs.rmSync(dir,{recursive:true,force:true});}}
+test('review, persistence, dedup, disable and delete',()=>lab(file=>{let m=createMemory(file);m.propose('project','Aerion usa mapas');m.propose('project','Aerion usa mapas');assert.equal(m.snapshot().entries.length,1);const id=m.snapshot().entries[0].id;assert.equal(m.context('Aerion',{provider:'local'}),'');m.review(id,'approved');m=createMemory(file);assert.match(m.context('Aerion',{provider:'local'}),/Aerion/);assert.equal(m.context('outro assunto',{provider:'local'}),'');m.review(id,'disabled');assert.equal(m.context('Aerion',{provider:'local'}),'');m.review(id,'delete');assert.equal(createMemory(file).snapshot().entries.length,0);}));
+test('cloud opt-in, remote exclusion, explicit request, bounded context and secret filter',()=>lab(file=>{const m=createMemory(file);const p=explicitMemory('ALEC, memoriza que prefiro português');assert.equal(p.category,'preference');m.propose(p.category,p.text);m.review(m.snapshot().entries[0].id,'approved');assert.equal(m.context('ola',{provider:'gemini'}),'');m.setCloud(true);assert.match(m.context('ola',{provider:'gemini'}),/português/);assert.equal(m.context('ola',{provider:'local',remote:true}),'');assert.equal(m.context('ola',{provider:'local',cc:true}),'');assert.equal(explicitMemory('Olá'),null);assert.throws(()=>m.propose('note','password: abc'));assert.ok(m.context('ola',{provider:'local'}).length<420);m.setTraits([0,20,40,60,80,100]);assert.match(createMemory(file).style(),/brevity 100/);assert.throws(()=>m.setTraits([101]));}));
+test('corrupt store is never overwritten',()=>lab(file=>{fs.writeFileSync(file,'broken');const m=createMemory(file);assert.ok(m.snapshot().problem);assert.throws(()=>m.propose('note','teste'));assert.equal(fs.readFileSync(file,'utf8'),'broken');}));
