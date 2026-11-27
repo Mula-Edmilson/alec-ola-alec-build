@@ -20,19 +20,28 @@ const server=http.createServer(async(req,res)=>{
 });
 await new Promise((ok,no)=>{server.once('error',no);server.listen(0,'127.0.0.1',ok);});
 let browser;
-const results=[];
+const results=[],failures=[];
 try{
  await fs.mkdir(dest,{recursive:true});
  browser=await chromium.launch({channel:'msedge',headless:true,chromiumSandbox:true});
  for(const [width,height] of [[300,410],[380,470],[480,620],[720,740]]){
   const context=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
-  const page=await context.newPage();const errors=[];
-  page.on('pageerror',e=>errors.push(e.message));
+  const page=await context.newPage();const errors=[];let scenario='startup';
+  page.on('pageerror',e=>{errors.push(e.message);console.error('Page error:',e.message);});
   await page.route('**/*',route=>route.request().url().startsWith('http://127.0.0.1:'+server.address().port+'/')?route.continue():route.abort());
-  const open=async(query)=>{await page.goto('http://127.0.0.1:'+server.address().port+'/panel/index.html?alec-layout-test&local&'+query);await page.waitForSelector('#pane-model:not([hidden]) .alec-model-head, #pane-whatsnew:not([hidden]) .alec-news-head');};
+  const open=async(query)=>{
+   scenario=query;errors.length=0;
+   const route=new URLSearchParams(query).get('tab')||'home';
+   await page.goto('http://127.0.0.1:'+server.address().port+'/panel/index.html?alec-layout-test&local&'+query);
+   try{await page.waitForFunction(id=>{const p=document.getElementById('pane-'+id);return p&&!p.hidden&&p.childElementCount>0&&p.clientHeight>0;},route,{timeout:12000});}
+   catch(e){throw Error('Failed to render '+route+'; '+JSON.stringify(await page.evaluate(()=>({visible:[...document.querySelectorAll('.pane:not([hidden])')].map(p=>({id:p.id,children:p.childElementCount})),title:document.title})))+'; JS: '+errors.join('; '),{cause:e});}
+   assert.deepEqual(errors,[],'Page errors on '+route);
+  };
   const measure=async(selector,label)=>{
    const result=await page.locator(selector).evaluate(p=>{
     const bounds=p.getBoundingClientRect(),right=bounds.left+p.clientWidth;
+    const header=document.querySelector('.head'),hb=header.getBoundingClientRect();
+    const hc=[...header.querySelectorAll('button')].filter(n=>!n.hidden&&n.getClientRects().length);
     const nodes=[...p.querySelectorAll('button,input:not([type=hidden]),select,textarea,.alec-account-group,.alec-news-card,.alec-model-head,.alec-news-item')].filter(n=>!n.closest('[hidden]')&&n.getClientRects().length);
     const outside=nodes.filter(n=>{const r=n.getBoundingClientRect();return r.width<=0||r.left<bounds.left-1||r.right>right+2;}).map(n=>n.dataset.k||n.id||n.className);
     const controls=nodes.filter(n=>n.matches('button,input,select,textarea')&&!n.closest('.sr-only'));
@@ -43,15 +52,25 @@ try{
       if(Math.min(x.right,y.right)-Math.max(x.left,y.left)>1&&Math.min(x.bottom,y.bottom)-Math.max(x.top,y.top)>1)collisions.push([a.dataset.k||a.id||a.textContent,b.dataset.k||b.id||b.textContent]);
     }
     p.scrollTop=p.scrollHeight;const reachable=p.scrollTop+p.clientHeight>=p.scrollHeight-2;p.scrollTop=0;
-    return {width:p.clientWidth,height:p.clientHeight,scrollHeight:p.scrollHeight,scrollWidth:p.scrollWidth,outside,collisions,reachable,controls:controls.length};
+    const headerOutside=hc.filter(n=>{const r=n.getBoundingClientRect();return r.left<hb.left-1||r.right>hb.right+1||r.top<hb.top-1||r.bottom>hb.bottom+1;}).map(n=>n.id);
+    const headerCollisions=[];for(let i=0;i<hc.length;i++)for(let j=i+1;j<hc.length;j++){const a=hc[i].getBoundingClientRect(),b=hc[j].getBoundingClientRect();if(Math.min(a.right,b.right)-Math.max(a.left,b.left)>1&&Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>1)headerCollisions.push([hc[i].id,hc[j].id]);}
+    return {width:p.clientWidth,height:p.clientHeight,scrollHeight:p.scrollHeight,scrollWidth:p.scrollWidth,outside,collisions,headerOutside,headerCollisions,reachable,controls:controls.length};
    });
    results.push({viewport:[width,height],label,...result});
    assert.equal(result.outside.length,0,label+' clipped controls: '+JSON.stringify(result.outside));
    assert.equal(result.collisions.length,0,label+' overlapping controls: '+JSON.stringify(result.collisions));
+   assert.deepEqual(result.headerOutside,[],label+' header clipped');assert.deepEqual(result.headerCollisions,[],label+' header overlap');
    assert.ok(result.reachable,label+' scroll end unreachable');
    assert.ok(result.scrollWidth<=result.width+2,label+' horizontal overflow');
   };
   try{
+   for(const route of ['home','conversations','vision','memory','remote','abilities','settings','about','appearance','speaking','listening','shortcuts','general']){
+    await open('tab='+route);
+    await page.screenshot({path:path.join(dest,route+'-'+width+'.png')});
+    await measure('#pane-'+route,'page-'+route);
+    const tabs=await page.locator('#pane-'+route+' [role=tab]').evaluateAll(nodes=>nodes.map(n=>n.id));
+    for(const id of tabs){await page.locator('#pane-'+route+' #'+id).click();await measure('#pane-'+route,route+'-'+id);await page.screenshot({path:path.join(dest,route+'-'+id+'-'+width+'.png')});}
+   }
    await open('tab=model');
    for(const tab of ['default','hybrid','crew','backups','accounts']){
     const button=page.locator('#tab-'+tab);if(!await button.count())continue;
@@ -85,12 +104,13 @@ try{
     await measure('#pane-whatsnew','release-'+v);
    }
    assert.deepEqual(errors,[],'JavaScript errors');
-  }catch(e){await page.screenshot({path:path.join(dest,'failure-'+width+'.png')}).catch(()=>{});throw e;}
+  }catch(e){await page.screenshot({path:path.join(dest,'failure-'+width+'.png')}).catch(()=>{});failures.push({viewport:[width,height],scenario,message:e.message,errors:[...errors]});console.error(width+'x'+height+' '+scenario+': '+e.message);}
   finally{await context.close();}
  }
 }finally{
  await fs.mkdir(dest,{recursive:true});
- await fs.writeFile(path.join(dest,'layout-report.json'),JSON.stringify(results,null,2));
+ await fs.writeFile(path.join(dest,'layout-report.json'),JSON.stringify({results,failures},null,2));
  await browser?.close();await new Promise(ok=>server.close(ok));
 }
+if(failures.length)throw Error('Visual validation failed: '+JSON.stringify(failures));
 console.log('ALEC layout verified: '+results.length+' scenarios; screenshots in '+dest);
