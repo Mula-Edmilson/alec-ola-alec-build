@@ -4,6 +4,11 @@ on:
     branches: [alec-browser-developer]
     paths:
       - 'desktop-redesign/native/alec-agent-plans.mjs'
+      - 'desktop-redesign/native/alec-native-agents.mjs'
+      - 'desktop-redesign/native/test-alec-native-agents.mjs'
+      - 'desktop-redesign/native/alec-trust.mjs'
+      - 'desktop-redesign/native/preparar-fonte.mjs'
+      - 'desktop-redesign/native/verificar-paridade.mjs'
       - 'desktop-redesign/native/alec-*-adapter.mjs'
       - 'desktop-redesign/native/test-alec-*-adapter.mjs'
       - 'desktop-redesign/native/test-alec-agent-plans.mjs'
@@ -29,7 +34,7 @@ jobs:
       - name: Check supervised launcher syntax
         run: node --check desktop-redesign/native/executar-agentes.mjs
       - name: Validate coordinator, real filesystem operations and Node tests
-        run: node --test desktop-redesign/native/test-alec-agent-plans.mjs desktop-redesign/native/test-alec-developer-adapter.mjs
+        run: node --test desktop-redesign/native/test-alec-agent-plans.mjs desktop-redesign/native/test-alec-developer-adapter.mjs desktop-redesign/native/test-alec-native-agents.mjs
       - name: Verify existing universal AI and trust policy
         run: node --test desktop-redesign/native/test-alec-universal.mjs desktop-redesign/native/test-alec-trust.mjs
   browser:
@@ -52,3 +57,27 @@ jobs:
         run: |
           openssl req -x509 -newkey rsa:2048 -nodes -days 1 -keyout "$RUNNER_TEMP/alec.key" -out "$RUNNER_TEMP/alec.crt" -subj '/CN=127.0.0.1' -addext 'subjectAltName=IP:127.0.0.1'
           ALEC_FIXTURE_KEY="$RUNNER_TEMP/alec.key" ALEC_FIXTURE_CERT="$RUNNER_TEMP/alec.crt" NODE_EXTRA_CA_CERTS="$RUNNER_TEMP/alec.crt" node --test desktop-redesign/native/test-alec-browser-adapter.mjs
+  native-integration:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Apply native integration to audited source and check parity
+        shell: bash
+        run: |
+          git clone --branch v0.1.51 --depth 1 https://github.com/KenKaiii/Roamies.git upstream
+          test "$(git -C upstream rev-parse HEAD)" = "362645466349f4c520ad453d94a94c2481776c2f"
+          node desktop-redesign/native/preparar-fonte.mjs upstream --public
+          node desktop-redesign/native/verificar-paridade.mjs upstream
+          node --check upstream/showcase/tauri/sidecar/sidekick.mjs
+          node --check upstream/showcase/panel/panel.js
+      - name: Install locked sidecar dependencies
+        working-directory: upstream/showcase/tauri/sidecar
+        run: npm ci
+      - name: Full sidecar regression tests
+        run: node desktop-redesign/native/executar-testes.mjs upstream/showcase/tauri/sidecar/test
