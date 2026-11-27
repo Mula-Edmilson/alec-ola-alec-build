@@ -1,5 +1,22 @@
 [
   {
+    "version": "0.3.9",
+    "title": "Live Stability",
+    "date": null,
+    "items": [
+      {
+        "kind": "fixed",
+        "title": "Reprodução progressiva",
+        "text": "Fila de áudio limitada e escalonada, sem encerrar a sessão quando a resposta chega mais depressa do que toca."
+      },
+      {
+        "kind": "improved",
+        "title": "Recuperação Live",
+        "text": "Retoma Gemini, compressão de contexto e reconexão limitada, mantendo a Orb durante a recuperação."
+      }
+    ]
+  },
+  {
     "version": "0.3.8",
     "title": "Native Orb Live",
     "date": null,

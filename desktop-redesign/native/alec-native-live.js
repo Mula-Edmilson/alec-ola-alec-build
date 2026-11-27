@@ -5,9 +5,10 @@
  let active=null;
  const send=(s,type,data={})=>invoke('alec_native_live_send',{msg:{type,session:s.id,...data}});
  const visual=(s,mode,level=0)=>{if(active===s)R.alecNativeLiveVisual={mode,level:Math.max(0,Math.min(1,level))};};
- function flush(s){for(const node of s.playing)try{node.stop();}catch{}s.playing.clear();s.next=s.ctx?.currentTime||0;}
+ const PLAYBACK_WINDOW=1.5, MAX_PENDING_BYTES=120*24000*2, MAX_PENDING_CHUNKS=2048;
+ function flush(s){s.pending=[];s.pendingBytes=0;for(const node of s.playing)try{node.stop();}catch{}s.playing.clear();s.next=s.ctx?.currentTime||0;}
  function cleanup(s,notify=false,reason='stopped'){
-  if(active!==s)return;active=null;clearInterval(s.heartbeat);clearTimeout(s.startDeadline);
+  if(active!==s)return;active=null;clearInterval(s.heartbeat);clearInterval(s.playbackTimer);clearTimeout(s.startDeadline);
   s.stream?.getTracks().forEach(t=>t.stop());s.node?.disconnect();s.source?.disconnect();flush(s);s.ctx?.close().catch(()=>{});
   R.alecNativeLiveVisual=null;R.alecNativeLiveSession=null;R.alecLiveRelease?.();
   if(notify)send(s,'alec_native_live_stop',{reason}).catch(()=>{});
@@ -39,7 +40,7 @@
    s.node.port.onmessage=e=>{
     if(active!==s||!s.ready)return;const frame=e.data;if(!(frame instanceof ArrayBuffer)||frame.byteLength!==2560)return;
     s.mic=rms(frame);
-    if(s.frames.length>=8){cleanup(s,true,'audio_backpressure');return;}s.frames.push(frame);pump(s);
+    if(s.frames.length>=32){cleanup(s,true,'audio_backpressure');return;}s.frames.push(frame);pump(s);
    };
    await send(s,'alec_native_live_ready');clearTimeout(s.startDeadline);
   }catch{cleanup(s,true,'microphone_or_audio_unavailable');}
@@ -48,11 +49,19 @@
  function playback(s,encoded){
   if(!s.ctx||!s.analyser||typeof encoded!=='string'||encoded.length>256000)return;
   const bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));if(!bytes.length||bytes.length%2)return;
-  if(s.next-s.ctx.currentTime>4){cleanup(s,true,'playback_backpressure');return;}
-  const data=new DataView(bytes.buffer),buffer=s.ctx.createBuffer(1,bytes.length/2,24000),samples=buffer.getChannelData(0);
-  for(let i=0;i<samples.length;i++)samples[i]=data.getInt16(i*2,true)/32768;
-  const source=s.ctx.createBufferSource();source.buffer=buffer;source.connect(s.analyser);
-  s.next=Math.max(s.ctx.currentTime+.025,s.next);source.start(s.next);s.next+=buffer.duration;s.playing.add(source);source.onended=()=>s.playing.delete(source);
+  if(s.pendingBytes+bytes.length>MAX_PENDING_BYTES||s.pending.length>=MAX_PENDING_CHUNKS){cleanup(s,true,'playback_capacity_exceeded');return;}
+  s.pending.push(bytes);s.pendingBytes+=bytes.length;drain(s);
+ }
+ function drain(s){
+  if(active!==s||!s.ctx||!s.analyser)return;
+  try{while(s.pending.length&&s.next-s.ctx.currentTime<PLAYBACK_WINDOW&&s.playing.size<256){
+   const bytes=s.pending.shift();s.pendingBytes-=bytes.length;
+   const data=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength),buffer=s.ctx.createBuffer(1,bytes.length/2,24000),samples=buffer.getChannelData(0);
+   for(let i=0;i<samples.length;i++)samples[i]=data.getInt16(i*2,true)/32768;
+   const source=s.ctx.createBufferSource();source.buffer=buffer;source.connect(s.analyser);
+   s.next=Math.max(s.ctx.currentTime+.025,s.next);source.start(s.next);s.next+=buffer.duration;s.playing.add(source);
+   source.onended=()=>{s.playing.delete(source);if(active===s)drain(s);};
+  }}catch{cleanup(s,true,'playback_failed');}
  }
  function animate(){requestAnimationFrame(animate);const s=active;if(!s)return;let mode=s.ready?'listen':'think',level=s.mic||0;
   if(s.playing.size&&s.analyser){const buf=new Float32Array(s.analyser.fftSize);s.analyser.getFloatTimeDomainData(buf);let sum=0;for(const x of buf)sum+=x*x;level=Math.min(1,Math.sqrt(sum/buf.length)*5);mode='talk';}
@@ -65,16 +74,17 @@
   if(!event||typeof event.session!=='string')return;
   if(event.type==='start'){
    if(active)cleanup(active,false);
-   const s={id:event.session,playing:new Set(),frames:[],next:0,ready:false,lastPong:performance.now(),mic:0};active=s;R.alecNativeLiveSession=s.id;R.alecLivePin?.();visual(s,'think');
+   const s={id:event.session,playing:new Set(),pending:[],pendingBytes:0,frames:[],next:0,ready:false,lastPong:performance.now(),mic:0};active=s;R.alecNativeLiveSession=s.id;R.alecLivePin?.();visual(s,'think');
    s.startDeadline=setTimeout(()=>cleanup(s,true,'audio_start_timeout'),20000);
    s.heartbeat=setInterval(()=>{if(performance.now()-s.lastPong>12000){cleanup(s,true,'sidecar_unavailable');return;}send(s,'alec_native_live_ping').catch(()=>cleanup(s,true,'ipc_failed'));},3000);
-   capture(s);return;
+   s.playbackTimer=setInterval(()=>drain(s),50);capture(s);return;
   }
   const s=active;if(!s||s.id!==event.session)return;
   if(event.type==='pong'){s.lastPong=performance.now();return;}
   if(event.type==='ready'){s.ready=true;visual(s,'listen');}
   else if(event.type==='audio'){try{playback(s,event.pcm);}catch{cleanup(s,true,'playback_failed');}}
   else if(event.type==='interrupt'){flush(s);visual(s,'listen',s.mic);}
+   else if(event.type==='reconnecting'){s.ready=false;s.frames=[];visual(s,'think');}
   else if(event.type==='closed'){cleanup(s,false);}
  };
  addEventListener('pagehide',()=>{if(active)cleanup(active,true,'window_closed');});
