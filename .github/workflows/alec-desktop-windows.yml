@@ -52,8 +52,9 @@ jobs:
         run: |
           node desktop-redesign/native/preparar-fonte.mjs upstream --public
           node desktop-redesign/native/verificar-paridade.mjs upstream
-          node --test desktop-redesign/native/test-alec-orb-evolution.mjs desktop-redesign/native/test-alec-adaptive-memory.mjs desktop-redesign/native/test-alec-proactive.mjs desktop-redesign/native/test-alec-universal.mjs desktop-redesign/native/test-alec-agent-plans.mjs desktop-redesign/native/test-alec-developer-adapter.mjs desktop-redesign/native/test-alec-native-agents.mjs
+          node --test desktop-redesign/native/test-alec-orb-evolution.mjs desktop-redesign/native/test-alec-adaptive-memory.mjs desktop-redesign/native/test-alec-universal.mjs desktop-redesign/native/test-alec-agent-plans.mjs desktop-redesign/native/test-alec-developer-adapter.mjs desktop-redesign/native/test-alec-native-agents.mjs
           node --test desktop-redesign/native/test-alec-conversation.mjs
+          node --test desktop-redesign/native/test-alec-proactive.mjs
           node desktop-redesign/native/testar-tailnet.mjs
           node desktop-redesign/native/testar-voz-alec.mjs
           node desktop-redesign/native/testar-contexto-local.mjs

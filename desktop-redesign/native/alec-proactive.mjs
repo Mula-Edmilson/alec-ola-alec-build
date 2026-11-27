@@ -6,6 +6,10 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {setTimeout as delay} from 'node:timers/promises';
 const run=promisify(execFile);
+// A manually requested process inventory may need a cold PowerShell Add-Type compilation.
+// Keep automatic polling at its original bound; do not retry on every background tick.
+export const diagnosticTimeout=details=>details?25000:10000;
+export const diagnosticFailure=e=>e?.killed===true?'timeout':e instanceof SyntaxError?'invalid_json':'provider_error';
 export const DEFAULT_SETTINGS=Object.freeze({enabled:false,system:true,foreground:false,clipboard:false,alerts:false});
 export function settings(v){return Object.fromEntries(Object.entries(DEFAULT_SETTINGS).map(([k,d])=>[k,typeof v?.[k]==='boolean'?v[k]:d]));}
 const pct=n=>typeof n==='number'&&Number.isFinite(n)&&n>=0&&n<=100?Math.round(n):null;
@@ -54,19 +58,19 @@ $o | ConvertTo-Json -Compress -Depth 4
 `;
 export async function sampleSystem(options,{details=false}={}){
  const s=settings(options), system=details||s.system, out={cpu:null,ram:null,totalMiB:null,freeMiB:null,diskFreeGiB:null,battery:null,ac:null,app:null,clipSeq:null,clipType:null,processes:[],partial:false};
- if(system){const a=cpuTotal();await delay(300);out.cpu=cpuPercent(a,cpuTotal());const total=os.totalmem(),free=os.freemem();out.ram=total>0?pct(100*(1-free/total)):null;out.totalMiB=Math.round(total/1048576);out.freeMiB=Math.round(free/1048576);try{const d=await fs.statfs(os.homedir());out.diskFreeGiB=Math.round(d.bavail*d.bsize/1073741824*10)/10;}catch{out.partial=true;}}
+ if(system){const a=cpuTotal();await delay(300);out.cpu=cpuPercent(a,cpuTotal());const total=os.totalmem(),free=os.freemem();out.ram=total>0?pct(100*(1-free/total)):null;out.totalMiB=Math.round(total/1048576);out.freeMiB=Math.round(free/1048576);try{const d=await fs.statfs(os.homedir());out.diskFreeGiB=Math.round(d.bavail*d.bsize/1073741824*10)/10;}catch{out.partial=true;out.diskIssue='unavailable';}}
  if(process.platform!=='win32'){out.partial=true;return out;}
  if(!system&&!s.foreground&&!s.clipboard)return out;
  try{
   const script=WIN_SCRIPT.replace('__SYSTEM__',system?'$true':'$false').replace('__FOREGROUND__',s.foreground?'$true':'$false').replace('__CLIPBOARD__',s.clipboard?'$true':'$false').replace('__DETAILS__',details?'$true':'$false');
   const exe=path.join(process.env.SystemRoot||'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe');
-  const {stdout}=await run(exe,['-NoLogo','-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],{windowsHide:true,timeout:10000,maxBuffer:65536,encoding:'utf8'});
+  const {stdout}=await run(exe,['-NoLogo','-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],{windowsHide:true,timeout:diagnosticTimeout(details),maxBuffer:65536,encoding:'utf8'});
   const q=JSON.parse(stdout.trim().replace(/^\uFEFF/,''));
   if(system){out.battery=pct(q.battery);out.ac=typeof q.ac==='boolean'?q.ac:null;}
   if(s.foreground)out.app=name(q.app);
   if(s.clipboard){out.clipSeq=Number.isSafeInteger(q.clipSeq)&&q.clipSeq>0?q.clipSeq:null;out.clipType=['files','image','text','other'].includes(q.clipType)?q.clipType:null;}
   if(details)out.processes=(Array.isArray(q.processes)?q.processes:[]).slice(0,5).map(p=>({name:name(p.name),ramMiB:num(p.ramMiB)})).filter(p=>p.name&&p.ramMiB!==null);
- }catch{out.partial=true;}
+ }catch(e){out.partial=true;out.providerIssue=diagnosticFailure(e);}
  return out;
 }
 export function createProactive({sample=sampleSystem,now=Date.now,allowed=()=>true,notify=()=>{},changed=()=>{}}={}){
