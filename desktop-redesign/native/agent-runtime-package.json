@@ -1,0 +1,12 @@
+{
+  "name": "alec-agent-runtime",
+  "version": "0.3.4",
+  "private": true,
+  "description": "Pinned optional Edge automation runtime for ALEC",
+  "dependencies": {
+    "playwright": "1.65.1"
+  },
+  "overrides": {
+    "playwright-core": "1.65.1"
+  }
+}
