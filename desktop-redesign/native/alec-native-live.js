@@ -21,7 +21,11 @@
  async function capture(s){
   if(active!==s||s.capturing||s.node)return;s.capturing=true;
   try{
-   s.ctx=new AudioContext({sampleRate:48000,latencyHint:'interactive'});await s.ctx.resume();
+   s.ctx??=new AudioContext({sampleRate:48000,latencyHint:'interactive'});
+   await Promise.race([s.ctx.resume(),new Promise(resolve=>setTimeout(resolve,900))]);
+   if(active!==s)return;
+   if(s.ctx.state!=='running'){s.waitingGesture=true;R.alecLiveGestureHint?.();return;}
+   s.waitingGesture=false;
    if(active!==s)return;
    if(s.ctx.state!=='running'||s.ctx.sampleRate%16000!==0)throw Error('audio_unavailable');
    s.stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:false});
@@ -56,6 +60,7 @@
  }
  requestAnimationFrame(animate);
  R.alecNativeLiveStop=()=>{if(active)cleanup(active,true);};
+ R.alecNativeLiveResume=()=>{if(active?.waitingGesture){capture(active);return true;}return false;};
  window.__alecNativeLive=event=>{
   if(!event||typeof event.session!=='string')return;
   if(event.type==='start'){
