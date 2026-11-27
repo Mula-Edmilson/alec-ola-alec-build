@@ -1,7 +1,7 @@
 // Native ALEC panel session. No model, remote, arbitrary command or auto-install hooks.
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {pathToFileURL} from 'node:url';
+import {pathToFileURL,fileURLToPath} from 'node:url';
 import {randomUUID} from 'node:crypto';
 import {normalizePlan,createAgentCoordinator} from './alec-agent-plans.mjs';
 import {createDeveloperAdapter} from './alec-developer-adapter.mjs';
@@ -9,10 +9,10 @@ import {createBrowserAdapter} from './alec-browser-adapter.mjs';
 const CAPS={browser:{navigate:'browser.read',read:'browser.read',click:'browser.interact',fill:'browser.interact',submit:'browser.submit'},developer:{list:'files.read',read:'files.read',proposePatch:'files.read',applyPatch:'files.write',runTest:'command.run'}};
 const MAX_REVIEW=16000;
 async function launchEdge(scope){
- if(process.platform!=='win32'||!process.env.LOCALAPPDATA)throw Error('Browser Agent requires Windows and Edge');
- const root=path.join(process.env.LOCALAPPDATA,'ALEC','agent-runtime','node_modules','playwright');
+ if(process.platform!=='win32')throw Error('Browser Agent requires Windows and Edge');
+ const root=fileURLToPath(new URL('../agent-runtime/node_modules/playwright/',import.meta.url));
  const pkg=JSON.parse(await fs.readFile(path.join(root,'package.json'),'utf8'));
- if(pkg.name!=='playwright'||pkg.version!=='1.65.1')throw Error('Install the approved Playwright 1.65.1 runtime first');
+ if(pkg.name!=='playwright'||pkg.version!=='1.65.1')throw Error('Bundled Playwright runtime missing or incompatible; reinstall ALEC');
  const {chromium}=await import(pathToFileURL(path.join(root,'index.mjs')).href);
  const browser=await chromium.launch({channel:'msedge',headless:true,chromiumSandbox:true});
  try{const a=await createBrowserAdapter({browser,scope});return {execute:a.execute,close:async()=>{try{await a.close();}finally{await browser.close();}}};}
@@ -20,13 +20,13 @@ async function launchEdge(scope){
 }
 export function createNativeAgents({trust,origin,changed=()=>{},browserFactory=launchEdge,developerFactory=createDeveloperAdapter,clock=Date.now}={}){
  if(!trust||origin?.kind!=='desktop'||origin?.verified!==true)throw Error('Verified local origin required');
- let session=null,staged=null,result=null,error='',busy=false,grant=null,handling=false;
+ let session=null,staged=null,result=null,error='',busy=false,grant=null,handling=false,plan=null;
  const emit=()=>changed();
- const snapshot=()=>({busy,error,session:session?{id:session.id,kind:session.kind,scope:session.scope,root:session.root,expires:session.expires}:null,staged:staged?{id:staged.id,step:staged.step,review:staged.review}:null,result});
+ const snapshot=()=>({busy,error,session:session?{id:session.id,kind:session.kind,scope:session.scope,root:session.root,expires:session.expires}:null,staged:staged?{id:staged.id,step:staged.step,review:staged.review}:null,plan,result});
  function revoke(){if(grant){trust.revoke(grant.id);grant=null;}}
  async function close(){
   if(busy)throw Error('Cancel the active action first');
-  const old=session;session=null;staged=null;result=null;error='';revoke();
+  const old=session;session=null;staged=null;result=null;plan=null;error='';revoke();
   if(old){clearTimeout(old.timer);await old.adapter.close?.();}
  }
  async function open(m){
@@ -62,6 +62,22 @@ export function createNativeAgents({trust,origin,changed=()=>{},browserFactory=l
    session.timer=setTimeout(()=>{if(session!==current)return;if(busy){const t=current.coordinator.snapshot();if(t)current.coordinator.cancel(t.id);}else void close().catch(()=>{}).finally(emit);},900000);session.timer.unref?.();
   }finally{busy=false;emit();}
  }
+ function importPlan(m){
+  if(busy||!session||staged||m.sessionId!==session.id||clock()>=session.expires)throw Error('Open an idle session first');
+  if(typeof m.value!=='string'||m.value.length>20000)throw Error('Invalid plan text');
+  const raw=JSON.parse(m.value);
+  if(!raw||raw.kind!==session.kind||!Array.isArray(raw.steps))throw Error('Plan kind mismatch');
+  // Model output may propose operations, never an alternate scope, values or permission.
+  if(raw.steps.some(s=>!s||Object.keys(s).some(k=>!['action','target'].includes(k))))throw Error('Only action and target are allowed');
+  const normalized=normalizePlan({kind:session.kind,scope:session.scope,steps:raw.steps});
+  plan={steps:normalized.steps,index:0};
+ }
+ function stagePlan(m){
+  if(!plan||plan.index>=plan.steps.length)throw Error('No remaining plan step');
+  const step=plan.steps[plan.index];
+  stage({...m,action:step.action,target:step.target});
+  staged.planIndex=plan.index;
+ }
  function stage(m){
   if(busy||!session||session.id!==m.sessionId||clock()>=session.expires)throw Error('Open a fresh session');
   if(staged)throw Error('Confirm or discard the existing proposal first');
@@ -81,7 +97,8 @@ export function createNativeAgents({trust,origin,changed=()=>{},browserFactory=l
    const task=c.prepare({kind:current.kind,scope:current.scope,steps:[entry.step]});
    grant=trust.grant({capability:CAPS[current.kind][entry.step.action],origin,scope:current.id+':'+entry.id,ttl:60000,approvedBy:'local-user'});
    if(entry.step.requiresApproval)c.approveStep(task.id,0,{...origin,approvedBy:'local-user'});
-   await c.next(task.id);
+   const completed=await c.next(task.id);
+   if(completed.state==='complete'&&plan&&entry.planIndex===plan.index){plan={...plan,index:plan.index+1};}
   }finally{revoke();staged=null;busy=false;if(clock()>=current.expires)await close();emit();}
  }
  async function handle(m){
@@ -91,6 +108,9 @@ export function createNativeAgents({trust,origin,changed=()=>{},browserFactory=l
   try{
    if(m.type==='alec_agents_open')await open(m);
    else if(m.type==='alec_agents_stage')stage(m);
+   else if(m.type==='alec_agents_import_plan')importPlan(m);
+   else if(m.type==='alec_agents_stage_plan')stagePlan(m);
+   else if(m.type==='alec_agents_clear_plan'&&!busy&&!staged)plan=null;
    else if(m.type==='alec_agents_confirm')await confirm(m);
    else if(m.type==='alec_agents_discard'&&!busy){staged=null;result=null;}
    else if(m.type==='alec_agents_close'&&!busy)await close();
