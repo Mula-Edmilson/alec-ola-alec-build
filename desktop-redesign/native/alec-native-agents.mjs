@@ -20,7 +20,7 @@ async function launchEdge(scope){
 }
 export function createNativeAgents({trust,origin,changed=()=>{},browserFactory=launchEdge,developerFactory=createDeveloperAdapter,clock=Date.now}={}){
  if(!trust||origin?.kind!=='desktop'||origin?.verified!==true)throw Error('Verified local origin required');
- let session=null,staged=null,result=null,error='',busy=false,grant=null;
+ let session=null,staged=null,result=null,error='',busy=false,grant=null,handling=false;
  const emit=()=>changed();
  const snapshot=()=>({busy,error,session:session?{id:session.id,kind:session.kind,scope:session.scope,root:session.root,expires:session.expires}:null,staged:staged?{id:staged.id,step:staged.step,review:staged.review}:null,result});
  function revoke(){if(grant){trust.revoke(grant.id);grant=null;}}
@@ -85,6 +85,8 @@ export function createNativeAgents({trust,origin,changed=()=>{},browserFactory=l
   }finally{revoke();staged=null;busy=false;if(clock()>=current.expires)await close();emit();}
  }
  async function handle(m){
+  if(handling&&m.type!=='alec_agents_cancel')return;
+  const cancel=m.type==='alec_agents_cancel';if(!cancel)handling=true;
   error='';
   try{
    if(m.type==='alec_agents_open')await open(m);
@@ -94,7 +96,7 @@ export function createNativeAgents({trust,origin,changed=()=>{},browserFactory=l
    else if(m.type==='alec_agents_close'&&!busy)await close();
    else if(m.type==='alec_agents_cancel'&&busy&&session){const t=session.coordinator.snapshot();if(t)session.coordinator.cancel(t.id);}
   }catch(e){error=String(e.message||e).slice(0,350);}
-  emit();
+  finally{if(!cancel)handling=false;emit();}
  }
- return Object.freeze({snapshot,handle,active:()=>busy});
+ return Object.freeze({snapshot,handle,active:()=>busy||handling});
 }
