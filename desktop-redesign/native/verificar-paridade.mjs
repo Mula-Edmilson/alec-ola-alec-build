@@ -1,5 +1,6 @@
 // Fail closed: all native functionality modules remain byte-identical to the pinned upstream.
 import assert from 'node:assert/strict';
+import vm from 'node:vm';
 import {execFileSync} from 'node:child_process';
 import {readFileSync} from 'node:fs';
 import path from 'node:path';
@@ -75,7 +76,22 @@ assert.ok(source.includes('verifyFreeModel(s,raw)')&&source.includes('if(singleM
 assert.equal(after(core+'alec-proactive.mjs'),readFileSync(new URL('./alec-proactive.mjs',import.meta.url),'utf8').replace(/\r\n/g,'\n'),'Proactive module integrity mismatch');
 assert.ok(source.includes('alecProactive.tick()')&&source.includes('alec_proactive_settings'),'Proactive native integration missing');
 assert.equal(after(core+'alec-adaptive-memory.mjs'),readFileSync(new URL('./alec-adaptive-memory.mjs',import.meta.url),'utf8').replace(/\r\n/g,'\n'),'Adaptive memory module integrity mismatch');
-assert.ok(source.includes('tools: textChat ? [] : alecSharedTools()')&&source.includes("tools.filter(t=>!t.name.startsWith('alec_agent_')&&t.name!=='alec_webcam_capture'&&(!config.lite||LITE_TOOLS.has(t.name))&&(!SIGMA_TOOL_NAMES.has(t.name)||alecSigma.available()))"),'Native tool availability and Sigma security gates must remain intact');
+assert.ok(source.includes('tools: textChat ? [] : alecSharedTools()'),'Normal tool-capable agent must use the shared catalogue');
+assert.ok(source.includes('createUnifiedLiveActions({runGoal:alecRunUnifiedGoal')&&source.includes("await prompt(goal,null,'',false,null,false)"),'Live must enter the same normal agent runtime');
+// Execute the actual transformed catalogue with synthetic tools and every relevant gate combination.
+const catalogueStart=source.indexOf('function alecSharedTools(){');
+const catalogueEnd=source.indexOf('\nasync function alecExtensionPermission',catalogueStart);
+assert.ok(catalogueStart>=0&&catalogueEnd>catalogueStart,'Shared catalogue missing');
+const names=['read_file','write_file','sigma_search','alec_agent_open','alec_agent_stage','alec_webcam_capture'];
+const fixture=vm.createContext({tools:names.map(name=>({name})),config:{lite:false},LITE_TOOLS:new Set(['read_file']),SIGMA_TOOL_NAMES:new Set(['sigma_search']),alecSigma:{available:()=>fixture.sigma},alecContext:{getStore:()=>fixture.remote},alecLiveLocked:false,sigma:false,remote:null});
+vm.runInContext(source.slice(catalogueStart,catalogueEnd),fixture);
+for(const lite of [false,true])for(const sigma of [false,true])for(const remote of [null,'fixture-device'])for(const live of [false,true]){
+ fixture.config.lite=lite;fixture.sigma=sigma;fixture.remote=remote;fixture.alecLiveLocked=live;
+ const expected=names.filter(n=>(!lite||n==='read_file')&&(n!=='sigma_search'||sigma)&&(!n.startsWith('alec_agent_')||!remote)&&(n!=='alec_webcam_capture'||(live&&!remote)));
+ assert.deepEqual(Array.from(fixture.alecSharedTools(),t=>t.name),expected,'Native catalogue gate regression');
+}
+assert.ok(source.includes("if(alecContext.getStore()||!config.allowActions)throw Error('native_actions_disabled')")&&source.includes("alecExtensionPermission('Captar uma fotografia da webcam'"),'Extension action permission gates required');
+console.log('Shared catalogue: 16 combinations of Lite, Sigma, remote and Live availability verified');
 assert.equal(after(core+'alec-sigma-vision.mjs'),readFileSync(new URL('./alec-sigma-vision.mjs',import.meta.url),'utf8').replace(/\r\n/g,'\n'),'Sigma module integrity mismatch');
 assert.ok(source.includes('const textChat = alecConversationOnly(config.provider,m);'),'Text-only gate missing');
 assert.ok(source.includes('const alecConversationOnly = (provider, model) => provider === \'local\''),'Text-only gating must be restricted to local-compatible models');
