@@ -923,7 +923,7 @@ function panel() {`);
   out['showcase/roamies/alec-native-live.js']=fs.readFileSync(new URL('./alec-native-live.js',import.meta.url),'utf8');
   out['showcase/roamies/alec-live-capture.js']=fs.readFileSync(new URL('../live/capture.js',import.meta.url),'utf8');
     rep(sc,"system: textChat ? shortSystem : system()+alecMemoryContext,","system: textChat ? shortSystem : system()+alecMemoryContext+'\\n\\nShared task recovery: do not give up after one recoverable tool failure. Inspect the actual error, verify current state, correct arguments or choose a different available tool and continue toward the same user-authorised goal within the agent turn budget. Do not repeat a mutation if its effect is uncertain; first verify whether it occurred. Stop on denied permission, user cancellation, genuinely unavailable capability, repeated no-progress or a real blocker. Never claim an external result without evidence.',");
-  rep(sc,"if (retryCount < 2 && firstFree(chainOrder(), limits).pick) {","if (retryCount < 2 && use.tools===0 && firstFree(chainOrder(), limits).pick) {");
+  rep(sc,"if (!singleMode(config) && retryCount < 2 && firstFree(chainOrder(), limits).pick) {","if (!singleMode(config) && retryCount < 2 && use.tools===0 && firstFree(chainOrder(), limits).pick) {");
 // Unified agent channel adapter: no separate tool loop in production Live.
   rep(sc,"const ui = (msg) => {","const ui = (msg) => {\n  if(alecUnifiedOutput(msg))return;");
   rep(sc,"const voice = VOICE_ON() ? speech.start() : (speech.stop(), null);","const voice = alecUnifiedTask ? null : VOICE_ON() ? speech.start() : (speech.stop(), null);");
