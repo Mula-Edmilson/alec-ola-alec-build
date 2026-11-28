@@ -191,3 +191,10 @@ test('Screen vision invokes the approved native screenshot object and transfers 
  approve=true;const receipt=await core.execute('take_screenshot',{target:'front'},signal,'2');assert.equal(receipt.imageSent,true);assert.deepEqual(sent[0],jpg);assert.doesNotMatch(JSON.stringify(receipt),new RegExp(jpg.toString('base64')));
  accept=false;await assert.rejects(core.execute('take_screenshot',{target:'front'},signal,'3'),/image_not_sent/);
 });
+
+test('Webcam is a private native tool and returns an image only after approval',async()=>{
+ let captured=0,approved=false;const tool={name:'alec_webcam_capture',parameters:{safeParse:a=>({success:true,data:a})},execute:async()=>{captured++;return {content:[{type:'image',mediaType:'image/jpeg',data:'/9gBAv/Z'}]}}};
+ const core=createLiveCore({registry:()=>[tool],confirm:async()=>approved,sendImage:()=>true});const sig=new AbortController().signal;
+ await assert.rejects(core.execute('alec_webcam_capture',{},sig,'1'),/not_approved/);assert.equal(captured,0);
+ approved=true;assert.equal((await core.execute('alec_webcam_capture',{},sig,'2')).imageSent,true);assert.equal(captured,1);
+});

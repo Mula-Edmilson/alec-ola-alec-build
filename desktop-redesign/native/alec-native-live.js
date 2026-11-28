@@ -7,8 +7,32 @@
  const visual=(s,mode,level=0)=>{if(active===s)R.alecNativeLiveVisual={mode,level:Math.max(0,Math.min(1,level))};};
  const PLAYBACK_WINDOW=1.5, MAX_PENDING_BYTES=120*24000*2, MAX_PENDING_CHUNKS=2048;
  function flush(s){s.pending=[];s.pendingBytes=0;for(const node of s.playing)try{node.stop();}catch{}s.playing.clear();s.next=s.ctx?.currentTime||0;}
+ function cancelCamera(s,request=null){
+  const c=s.camera;if(!c||request&&c.id!==request)return;
+  s.camera=null;clearTimeout(c.timer);c.stream?.getTracks().forEach(t=>t.stop());if(c.video){c.video.pause();c.video.srcObject=null;}
+ }
+ async function camera(s,id){
+  if(active!==s||!s.ready||s.camera||typeof id!=='string'||!/^[a-f0-9-]{36}$/i.test(id))return;
+  const c={id,stream:null,video:null,timer:null};s.camera=c;
+  const valid=()=>active===s&&s.camera===c&&s.ready;
+  const result=async jpeg=>{if(!valid())return;cancelCamera(s,id);try{await send(s,'alec_native_live_camera_result',{request:id,...(jpeg?{jpeg}:{error:'camera_unavailable'})});}catch{}};
+  c.timer=setTimeout(()=>{void result(null);},11000);
+  try{
+   const stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{width:{ideal:640},height:{ideal:480},facingMode:'user'}});
+   if(!valid()){stream.getTracks().forEach(t=>t.stop());return;}c.stream=stream;
+   const video=document.createElement('video');c.video=video;video.muted=true;video.playsInline=true;video.srcObject=stream;await video.play();
+   await new Promise(resolve=>setTimeout(resolve,700));if(!valid())return;
+   if(!video.videoWidth||!video.videoHeight)throw Error('camera_unavailable');
+   const scale=Math.min(1,640/Math.max(video.videoWidth,video.videoHeight));
+   const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(video.videoWidth*scale));canvas.height=Math.max(1,Math.round(video.videoHeight*scale));
+   const ctx=canvas.getContext('2d');if(!ctx)throw Error('camera_unavailable');ctx.drawImage(video,0,0,canvas.width,canvas.height);
+   const uri=canvas.toDataURL('image/jpeg',.75),prefix='data:image/jpeg;base64,';
+   if(!uri.startsWith(prefix)||uri.length>700023)throw Error('camera_unavailable');
+   await result(uri.slice(prefix.length));
+  }catch{await result(null);}finally{if(s.camera===c)cancelCamera(s,id);}
+ }
  function cleanup(s,notify=false,reason='stopped'){
-  if(active!==s)return;active=null;clearInterval(s.heartbeat);clearInterval(s.playbackTimer);clearTimeout(s.startDeadline);
+  if(active!==s)return;cancelCamera(s);active=null;clearInterval(s.heartbeat);clearInterval(s.playbackTimer);clearTimeout(s.startDeadline);
   s.stream?.getTracks().forEach(t=>t.stop());s.node?.disconnect();s.source?.disconnect();flush(s);s.ctx?.close().catch(()=>{});
   R.alecNativeLiveVisual=null;R.alecNativeLiveSession=null;R.alecLiveRelease?.();
   if(reason!=='stopped')R.alecLiveStatus?.(reason);
@@ -83,11 +107,13 @@
   }
   const s=active;if(!s||s.id!==event.session)return;
   if(event.type==='pong'){s.lastPong=performance.now();return;}
+  if(event.type==='camera_request'){void camera(s,event.request);return;}
+  if(event.type==='camera_cancel'){cancelCamera(s,event.request);return;}
   if(event.type==='ready'){s.ready=true;visual(s,'listen');}
   else if(event.type==='context_reset'){R.alecLiveStatus?.('context_reset');}
   else if(event.type==='audio'){try{playback(s,event.pcm);}catch{cleanup(s,true,'playback_failed');}}
   else if(event.type==='interrupt'){flush(s);visual(s,'listen',s.mic);}
-   else if(event.type==='reconnecting'){s.ready=false;s.frames=[];visual(s,'think');}
+   else if(event.type==='reconnecting'){cancelCamera(s);s.ready=false;s.frames=[];visual(s,'think');}
   else if(event.type==='closed'){cleanup(s,false,typeof event.reason==='string'?event.reason:'connection_closed');}
  };
  addEventListener('pagehide',()=>{if(active)cleanup(active,true,'window_closed');});
