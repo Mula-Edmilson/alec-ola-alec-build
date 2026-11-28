@@ -110,6 +110,9 @@ jobs:
         run: |
           rustc --edition=2021 --test upstream/showcase/tauri/src-tauri/voice-win/src/wake.rs -o wake-tests.exe
           ./wake-tests.exe
+          rustc --edition=2021 --test desktop-redesign/native/test-alec-live-hotkeys.rs -o alec-live-hotkeys.exe
+          ./alec-live-hotkeys.exe
+          if [ "$GITHUB_REF_NAME" = "alec-live-intelligence" ]; then node desktop-redesign/native/testar-live-integracao.mjs upstream; fi
           rustc --edition=2021 --test upstream/showcase/tauri/src-tauri/voice-win/src/alec_conversation.rs -o conversation-tests.exe
           ./conversation-tests.exe
           rustfmt --edition 2021 --emit stdout --config skip_children=true upstream/showcase/tauri/src-tauri/voice-win/src/main.rs > /dev/null

@@ -20,3 +20,6 @@ As transcrições textuais de turnos completos são guardadas na sessão normal;
 
 ### Webcam Live (candidato)
 Captura única da webcam por WebView2, independente do Bridge Remote, após aprovação local de cada pedido. O dispositivo é libertado antes de enviar a fotografia JPEG; cancelamento, reconexão e timeout libertam as pistas de vídeo e descartam resultados tardios. O sistema operativo pode negar a permissão ou o dispositivo pode não estar disponível. As ferramentas de webcam e preparação de agentes são exclusivas do catálogo Live, não aparecem no modelo normal. O ensaio físico de câmera/Windows e API Gemini permanece necessário.
+
+### Atalho e selecção de área
+Ctrl+Shift continua a usar o detector nativo (toque e libertação) e a rota Ask do Live. Botão de reposição em Definições > Atalhos não altera silenciosamente o par de fala. A selecção de área usa JPEG do helper Windows, evita a chamada macOS-only a sips e pede a pergunta com autorização expressa do envio ao Gemini. Se a ligação não estiver pronta, não envia. Testes do detector Rust e da cablagem migrada são distintos da validação do teclado físico, foco e ecrã.
