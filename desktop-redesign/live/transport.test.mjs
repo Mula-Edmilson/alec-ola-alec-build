@@ -74,7 +74,7 @@ test('Live tasks acknowledge immediately while work is pending; audio and reconn
 });
 test('Live task policy denies unknown or unapproved actions; cancellation and replay never launch twice',async()=>{
  let allowed=false,count=0;
- const actions=createLiveActions({authorize:()=>allowed,execute:async()=>{count++;return {status:'launch_requested'};}});
+ const actions=createLiveActions({authorize:()=>allowed,execute:async()=>{count++;return {status:'window_verified',windowVerified:true};}});
  const start=(id,args)=>actions.call({id,name:'alec_start_task',args});
  try{
   assert.equal(start('a',{operation:'open_app',app:'notepad'}).error,'not_authorized');
@@ -83,8 +83,8 @@ test('Live task policy denies unknown or unapproved actions; cancellation and re
   assert.equal(start('c',{operation:'open_app',app:'notepad',command:'x'}).error,'invalid_or_unavailable_tool');
   const t=start('d',{operation:'open_app',app:'notepad'});await tick();await tick();assert.equal(count,1);
   assert.equal(start('d',{operation:'open_app',app:'notepad'}).task_id,t.task_id);
-  assert.equal(start('e',{operation:'open_app',app:'notepad'}).duplicate,true);await tick();assert.equal(count,1);
-  const read=start('f',{operation:'sigma_search',query:'photos'});actions.cancelCalls(['f']);await tick();assert.equal(count,1);
+  const retry=start('e',{operation:'open_app',app:'notepad'});assert.notEqual(retry.task_id,t.task_id);await tick();await tick();assert.equal(count,2);
+  const read=start('f',{operation:'sigma_search',query:'photos'});actions.cancelCalls(['f']);await tick();assert.equal(count,2);
   assert.equal(actions.call({id:'status',name:'alec_task_status',args:{task_id:read.task_id}}).state,'cancelled');
   allowed=false;assert.equal(actions.call({id:'check',name:'alec_task_status',args:{task_id:t.task_id}}).error,'permission_revoked');
  }finally{actions.close();}
@@ -140,4 +140,11 @@ test('Live denies discovery and memory when grant is revoked and allows explicit
  const second=a.call({id:'second',name:'alec_start_task',args});assert.notEqual(first.task_id,second.task_id);await tick();await tick();assert.equal(invoked,2);
  allowed=false;assert.equal(a.call({id:'catalog',name:'alec_core_catalog',args:{}}).error,'not_authorized');assert.equal(a.call({id:'memory',name:'alec_core_memory',args:{query:'project'}}).error,'not_authorized');
  }finally{a.close();}
+});
+
+ test('unverified app launch fails closed, replay stays idempotent, and a new request may retry',async()=>{
+ let count=0;const actions=createLiveActions({authorize:()=>true,execute:async()=>++count===1?{status:'launch_requested',windowVerified:false}:{status:'window_verified',windowVerified:true}});
+ const start=id=>actions.call({id,name:'alec_start_task',args:{operation:'open_app',app:'calculator'}});
+ const status=(id,task)=>actions.call({id,name:'alec_task_status',args:{task_id:task}});
+ try{const a=start('launch1');await tick();await tick();const failed=status('proof1',a.task_id);assert.equal(failed.state,'failed');assert.equal(failed.error,'window_not_verified');assert.equal(start('launch1').task_id,a.task_id);assert.equal(count,1);const b=start('launch2');assert.notEqual(b.task_id,a.task_id);await tick();await tick();assert.equal(status('proof2',b.task_id).result.windowVerified,true);assert.equal(count,2);}finally{actions.close();}
 });
