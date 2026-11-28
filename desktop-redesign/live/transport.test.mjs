@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createLiveSession,createResilientLiveSession,createLiveActions,createLiveCore,liveInstruction} from './transport.mjs';
+import {createLiveSession,createResilientLiveSession,createLiveActions,createLiveCore,liveInstruction,createUnifiedLiveActions} from './transport.mjs';
 class Fake extends EventTarget{readyState=1;bufferedAmount=0;sent=[];send(s){this.sent.push(JSON.parse(s));}close(){this.readyState=3;}message(data){this.dispatchEvent(new MessageEvent('message',{data:JSON.stringify(data)}));}}
 const tick=()=>new Promise(r=>setImmediate(r));
 test('setup gates microphone, sends PCM16, streams audio and flush signal, then closes',async()=>{
@@ -266,4 +266,17 @@ test('Unified Live delegates every ordinary tool to its native policy without a 
  await core.execute('alec_webcam_capture',{},signal,'6');assert.equal(wrapperPrompts,1);
  allow=false;await assert.rejects(core.execute('run_command',{},signal,'7'),/actions_off/);assert.equal(wrapperPrompts,1);
  assert.equal(invocations.length,7);
+});
+
+test('Desktop Live delegates the whole user goal to the shared agent, not individual tools',async()=>{
+ const goals=[],jobs=[],states=[];const actions=createUnifiedLiveActions({authorize:()=>true,runGoal:async(goal,signal)=>{goals.push(goal);return {status:'agent_finished',reply:'completed shared turn',tools:[{tool:'search_files',error:true},{tool:'list_files',error:false}]};},schedule:f=>jobs.push(f),changed:s=>states.push(s)});
+ const ws=new Fake();const s=createResilientLiveSession({apiKey:'x',model:'gemini-live',requireActions:true,actions,socket:()=>ws});
+ try{ws.dispatchEvent(new Event('open'));const setup=ws.sent[0].setup;assert.deepEqual(setup.tools[0].functionDeclarations.map(x=>x.name),['alec_execute_goal','alec_task_status','alec_cancel_task']);assert.doesNotMatch(setup.systemInstruction.parts[0].text,/Neste modo apenas conversas/);
+ const c={id:'goal1',name:'alec_execute_goal',args:{goal:'Find the file using alternative methods'}},q=actions.call(c);assert.equal(q.state,'queued');assert.equal(actions.call(c).duplicate,true);assert.equal(actions.call({id:'old',name:'alec_start_task',args:{operation:'core_tool'}}).state,'rejected');jobs.shift()();await tick();assert.deepEqual(goals,[c.args.goal]);const r=actions.call({id:'check',name:'alec_task_status',args:{task_id:q.task_id}});assert.equal(r.state,'complete');assert.equal(r.result.tools.length,2);
+ }finally{s.close();actions.close();}
+});
+test('Shared agent task cancellation waits for actual turn to stop',async()=>{
+ let release,seen;const jobs=[];const a=createUnifiedLiveActions({authorize:()=>true,runGoal:async(goal,signal)=>{seen=signal;await new Promise(r=>release=r);return {status:'agent_finished'};},schedule:f=>jobs.push(f)});
+ const q=a.call({id:'g',name:'alec_execute_goal',args:{goal:'read file'}});jobs.shift()();await tick();
+ assert.equal(a.call({id:'c',name:'alec_cancel_task',args:{task_id:q.task_id}}).state,'cancel_requested');assert.equal(seen.aborted,true);release();await tick();assert.equal(a.call({id:'s',name:'alec_task_status',args:{task_id:q.task_id}}).state,'cancelled');a.close();
 });

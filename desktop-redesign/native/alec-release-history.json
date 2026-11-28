@@ -1,5 +1,22 @@
 [
   {
+    "version": "0.4.5",
+    "title": "Shared Agent Runtime",
+    "date": null,
+    "items": [
+      {
+        "kind": "fixed",
+        "title": "Um único ciclo de execução",
+        "text": "Os pedidos Live usam a mesma função prompt e o mesmo ciclo agêntico do modo normal, sem o executor de ferramentas paralelo."
+      },
+      {
+        "kind": "improved",
+        "title": "Recuperação e comunicação",
+        "text": "O modelo normal pode interpretar resultados e usar estratégias alternativas; Live recebe o resultado da actividade sem iniciar uma segunda voz."
+      }
+    ]
+  },
+  {
     "version": "0.4.4",
     "title": "Unified Core Architecture",
     "date": null,

@@ -18,7 +18,7 @@ assert.match(side,/if\(alecLiveLocked\)return alecLiveArea\(\)/);
 assert.match(host,/alecNativeLiveSession&&!ask/);
 assert.match(panel,/Repor Ctrl\+Shift/);
 assert.match(side,/saveKeys\(\{\.\.\.keys\(\),write:pair\}\)/);
-assert.match(side,/registry:alecLiveRegistry,nativePolicy:true,invoke:alecLiveInvoke/);
+assert.match(side,/createUnifiedLiveActions\(\{runGoal:alecRunUnifiedGoal/);
 assert.match(side,/createLiveAgentBridge\(\{agents:alecNativeAgents/);
 assert.match(side,/!t\.name\.startsWith\('alec_agent_'\)&&t\.name!=='alec_webcam_capture'/);
 assert.match(shell,/alec_native_live_camera_result/);
@@ -36,9 +36,12 @@ assert.doesNotMatch(panel,/\?\s*'alec_live_stop'\s*:\s*'alec_live_start'/);
 console.log('Desktop Live has exactly one authorised activation path; no conversation-only desktop fallback');
 
 assert.match(side,/tools: textChat \? \[\] : alecSharedTools\(\)/);
-assert.match(side,/function alecLiveRegistry\(\)\{return \[\.\.\.alecSharedTools\(\)/);
-assert.match(side,/skipAllow:\(\)=>!!config\.allowActions&&!!config\.skipAllow/);
-assert.match(side,/activity\.start\(id,name,args\)/);
-assert.match(side,/activity\.end\(id,failed\)/);
-assert.match(side,/reviewPlan:async\(_plan,signal\)=>!signal\.aborted/);
-console.log('Unified native catalog, permission inheritance and shared activity dispatch verified');
+
+assert.match(side,/async function alecRunUnifiedGoal\(goal,signal\)/);
+assert.match(side,/await prompt\(goal,null,'',false,null,false\)/);
+assert.match(side,/for await \(const e of agentEvents\(agent\.prompt\(content\)\)\)/);
+assert.match(side,/if\(alecUnifiedOutput\(msg\)\)return/);
+assert.match(side,/const voice = alecUnifiedTask \? null : VOICE_ON/);
+assert.doesNotMatch(side,/const core=createLiveCore/);
+assert.doesNotMatch(side,/alecLiveActions=createLiveActions/);
+console.log('Live delegates user goals to the exact same prompt and native agent loop as normal requests');
