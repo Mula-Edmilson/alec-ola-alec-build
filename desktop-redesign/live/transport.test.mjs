@@ -58,7 +58,7 @@ test('Live tasks acknowledge immediately while work is pending; audio and reconn
  const actions=createLiveActions({authorize:()=>true,execute:async args=>{work.push(args);return new Promise(r=>{complete=r;});}});
  const s=createResilientLiveSession({apiKey:'x',model:'gemini-live',retryDelay:1,actions,socket:()=>{const f=new Fake();sockets.push(f);return f;},emit:e=>events.push(e)});
  try{
-  const ws=sockets[0];ws.dispatchEvent(new Event('open'));assert.equal(ws.sent[0].setup.tools[0].functionDeclarations.length,5);
+  const ws=sockets[0];ws.dispatchEvent(new Event('open'));assert.deepEqual(ws.sent[0].setup.tools[0].functionDeclarations.map(d=>d.name).sort(),['alec_start_task','alec_core_catalog','alec_core_skills','alec_core_memory','alec_task_status','alec_cancel_task'].sort());
   ws.message({setupComplete:{}});await tick();
   const fc={id:'task1',name:'alec_start_task',args:{operation:'system_status'}};
   ws.message({toolCall:{functionCalls:[fc]}});await tick();await tick();
