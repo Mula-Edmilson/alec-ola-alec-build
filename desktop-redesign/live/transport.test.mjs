@@ -198,3 +198,39 @@ test('Webcam is a private native tool and returns an image only after approval',
  await assert.rejects(core.execute('alec_webcam_capture',{},sig,'1'),/not_approved/);assert.equal(captured,0);
  approved=true;assert.equal((await core.execute('alec_webcam_capture',{},sig,'2')).imageSent,true);assert.equal(captured,1);
 });
+
+test('Universal plan preflights all steps, requires local review, and verifies mutations before continuing',async()=>{
+ const {normalizeUniversalPlan,executeUniversalPlan}=await import('./transport.mjs');
+ const plan=normalizeUniversalPlan({goal:'Report',steps:[{operation:'system_status'},{operation:'core_tool',tool:'write_file',args:{path:'report.txt',content:'ok'}},{operation:'open_app',app:'notepad'}]});
+ const calls=[],progress=[],signal=new AbortController().signal;
+ const opts={signal,authorize:()=>true,validateStep:()=>true,reviewPlan:async()=>true,progress:p=>progress.push(p),execute:async s=>{calls.push(s.operation);return s.tool==='write_file'?{status:'file_verified',fileVerified:true}:s.operation==='open_app'?{status:'window_verified',windowVerified:true}:{cpu:20};}};
+ assert.equal((await executeUniversalPlan(plan,{...opts,reviewPlan:async()=>false})).status,'denied');assert.equal(calls.length,0);
+ assert.equal((await executeUniversalPlan(plan,{...opts,validateStep:s=>s.operation!=='open_app'})).status,'denied');assert.equal(calls.length,0);
+ const result=await executeUniversalPlan(plan,opts);assert.equal(result.status,'complete');assert.equal(result.completed,3);assert.deepEqual(result.receipts.map(r=>r.state),['read_returned','verified','verified']);assert.equal(progress.length,6);
+ calls.length=0;const unknown=await executeUniversalPlan(plan,{...opts,execute:async s=>{calls.push(s.operation);return {output:'success'};}});assert.equal(unknown.status,'needs_review');assert.equal(unknown.replanAllowed,false);assert.equal(calls.length,2);
+ assert.throws(()=>normalizeUniversalPlan({goal:'unsafe',steps:[{operation:'core_tool',tool:'run_command',args:{command:'anything'}}]}),/invalid_plan_step/);
+ assert.throws(()=>normalizeUniversalPlan({goal:'duplicate',steps:[plan.steps[1],plan.steps[1]]}),/duplicate_plan_mutation/);
+});
+test('Universal plan uses existing serial queue, progress, retry and bounded replan receipts',async()=>{
+ const signal=new AbortController();let calls=0;
+ const a=createLiveActions({authorize:()=>true,validateStep:()=>true,reviewPlan:async()=>true,execute:async s=>{calls++;if(s.operation==='system_status')throw Error('EAGAIN');return {items:[]};}});
+ let id=0;const start=p=>a.call({id:String(++id),name:'alec_start_task',args:{operation:'plan',plan_json:JSON.stringify(p)}});
+ const status=t=>a.call({id:String(++id),name:'alec_task_status',args:{task_id:t.task_id}});
+ try{const p={goal:'Find files',steps:[{operation:'system_status'}]};const first=start(p);assert.equal(first.state,'queued');await tick();await tick();assert.equal(calls,2);const fail=status(first);assert.equal(fail.state,'failed');assert.equal(fail.result.replanAllowed,true);assert.equal(fail.result.receipts[0].attempts,2);
+ const second=start({goal:p.goal,parent_task_id:first.task_id,steps:[{operation:'sigma_search',query:'file'}]});assert.equal(second.state,'queued');await tick();await tick();assert.equal(status(second).state,'complete');
+ assert.equal(start({goal:p.goal,parent_task_id:first.task_id,steps:[{operation:'sigma_search',query:'other'}]}).error,'replan_not_allowed');
+ }finally{a.close();signal.abort();}
+});
+test('Cancellation waits for an in-flight mutation and never claims rollback',async()=>{
+ let finish;const a=createLiveActions({authorize:()=>true,validateStep:()=>true,reviewPlan:async()=>true,execute:()=>new Promise(r=>{finish=r;})});
+ try{const task=a.call({id:'p',name:'alec_start_task',args:{operation:'plan',plan_json:JSON.stringify({goal:'Write',steps:[{operation:'core_tool',tool:'write_file',args:{path:'report.txt',content:'data'}}]})}});await tick();
+ const c=a.call({id:'c',name:'alec_cancel_task',args:{task_id:task.task_id}});assert.equal(c.state,'cancel_requested');finish({status:'file_verified',fileVerified:true});await tick();
+ const status=a.call({id:'s',name:'alec_task_status',args:{task_id:task.task_id}});assert.equal(status.state,'cancelled');assert.equal(status.result.receipts[0].state,'effect_unknown');assert.equal(status.result.replanAllowed,false);
+ }finally{a.close();}
+});
+test('Independent write proof uses real native readback, not a success string',async()=>{
+ let contents='',matches=true;const params={safeParse:data=>({success:true,data})};
+ const core=createLiveCore({registry:()=>[{name:'write_file',parameters:params,execute:async a=>{contents=a.content;return 'Success';}},{name:'read_file',parameters:params,execute:async()=>matches?contents:'different'}],actionsAllowed:()=>true,confirm:async()=>true});
+ const s=new AbortController().signal;
+ assert.equal((await core.execute('write_file',{path:'report.txt',content:'data'},s,'w')).fileVerified,true);matches=false;assert.equal((await core.execute('write_file',{path:'report.txt',content:'data'},s,'x')).fileVerified,false);
+});

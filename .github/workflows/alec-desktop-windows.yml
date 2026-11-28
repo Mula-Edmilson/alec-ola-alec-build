@@ -5,7 +5,7 @@ on:
     branches: [main]
     types: [opened, synchronize, reopened]
   push:
-    branches: [alec-desktop-redesign, alec-proactive-v7, alec-qr-v7.1, alec-qr-v7.2, alec-vision-v8, alec-signed-updater, alec-browser-developer, alec-panel-polish, alec-conversation-engine, alec-live-engine, alec-native-live, alec-live-intelligence]
+    branches: [alec-desktop-redesign, alec-proactive-v7, alec-qr-v7.1, alec-qr-v7.2, alec-vision-v8, alec-signed-updater, alec-browser-developer, alec-panel-polish, alec-conversation-engine, alec-live-engine, alec-native-live, alec-live-intelligence, alec-autonomous-042]
     paths:
       - '.github/workflows/alec-desktop-windows.yml'
       - 'desktop-redesign/native/**'
@@ -112,7 +112,7 @@ jobs:
           ./wake-tests.exe
           rustc --edition=2021 --test desktop-redesign/native/test-alec-live-hotkeys.rs -o alec-live-hotkeys.exe
           ./alec-live-hotkeys.exe
-          if [ "$GITHUB_REF_NAME" = "alec-live-intelligence" ]; then node desktop-redesign/native/testar-live-integracao.mjs upstream; fi
+          if [ "$GITHUB_REF_NAME" = "alec-live-intelligence" ] || [ "$GITHUB_REF_NAME" = "alec-autonomous-042" ]; then node desktop-redesign/native/testar-live-integracao.mjs upstream; fi
           rustc --edition=2021 --test upstream/showcase/tauri/src-tauri/voice-win/src/alec_conversation.rs -o conversation-tests.exe
           ./conversation-tests.exe
           rustfmt --edition 2021 --emit stdout --config skip_children=true upstream/showcase/tauri/src-tauri/voice-win/src/main.rs > /dev/null
@@ -125,7 +125,7 @@ jobs:
             upstream/showcase/tauri/src-tauri/hands-win -> target
           key: alec-windows-v7-icon
       - name: Native Windows voice session regression tests
-        if: github.ref_name == 'alec-conversation-engine' || github.ref_name == 'alec-live-engine' || github.ref_name == 'alec-native-live' || github.ref_name == 'alec-live-intelligence' || github.ref_name == 'alec-signed-updater'
+        if: github.ref_name == 'alec-conversation-engine' || github.ref_name == 'alec-live-engine' || github.ref_name == 'alec-native-live' || github.ref_name == 'alec-live-intelligence' || github.ref_name == 'alec-autonomous-042' || github.ref_name == 'alec-signed-updater'
         shell: bash
         run: cargo test --locked --manifest-path upstream/showcase/tauri/src-tauri/voice-win/Cargo.toml --bin roamies-voice
       - name: Install Tauri CLI

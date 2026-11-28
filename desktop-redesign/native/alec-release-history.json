@@ -1,5 +1,27 @@
 [
   {
+    "version": "0.4.2",
+    "title": "Autonomous Task Intelligence",
+    "date": null,
+    "items": [
+      {
+        "kind": "new",
+        "title": "Planos universais no Live",
+        "text": "Fila nativa de até seis etapas, validação e revisão local, progresso e recibos por etapa."
+      },
+      {
+        "kind": "improved",
+        "title": "Verificação e recuperação",
+        "text": "Leitura independente para escrita de ficheiros, janela verificada nos abridores suportados, repetição limitada de leituras e propostas de replaneamento."
+      },
+      {
+        "kind": "fixed",
+        "title": "Cancelamento responsável",
+        "text": "Não repetir mutações nem afirmar rollback quando o efeito não pode ser confirmado."
+      }
+    ]
+  },
+  {
     "version": "0.4.1",
     "title": "Unified Intelligence",
     "date": null,
