@@ -20,13 +20,13 @@ async function launchEdge(scope){
 }
 export function createNativeAgents({trust,origin,changed=()=>{},browserFactory=launchEdge,developerFactory=createDeveloperAdapter,clock=Date.now}={}){
  if(!trust||origin?.kind!=='desktop'||origin?.verified!==true)throw Error('Verified local origin required');
- let session=null,staged=null,result=null,error='',busy=false,grant=null,handling=false,plan=null;
+ let session=null,staged=null,result=null,error='',busy=false,grant=null,handling=false,plan=null,lastOperation=null;
  const emit=()=>changed();
- const snapshot=()=>({busy,error,session:session?{id:session.id,kind:session.kind,scope:session.scope,root:session.root,expires:session.expires}:null,staged:staged?{id:staged.id,step:staged.step,review:staged.review}:null,plan,result});
+ const snapshot=()=>({busy,error,session:session?{id:session.id,kind:session.kind,scope:session.scope,root:session.root,expires:session.expires}:null,staged:staged?{id:staged.id,step:staged.step,review:staged.review}:null,plan,result,lastOperation:lastOperation?{...lastOperation}:null});
  function revoke(){if(grant){trust.revoke(grant.id);grant=null;}}
  async function close(){
   if(busy)throw Error('Cancel the active action first');
-  const old=session;session=null;staged=null;result=null;plan=null;error='';revoke();
+  const old=session;session=null;staged=null;result=null;plan=null;lastOperation=null;error='';revoke();
   if(old){clearTimeout(old.timer);await old.adapter.close?.();}
  }
  async function open(m){
@@ -87,19 +87,19 @@ export function createNativeAgents({trust,origin,changed=()=>{},browserFactory=l
   if(step.action==='fill'){if(typeof m.value!=='string'||m.value.length>2000)throw Error('Invalid form value');payload={value:m.value};review={value:m.value};}
   if(step.action==='proposePatch'){if(typeof m.value!=='string'||m.value.length>MAX_REVIEW)throw Error('Replacement too large');payload={replacement:m.value};review={replacement:m.value};}
   if(step.action==='applyPatch'){const p=session.proposals.get(step.target);if(!p)throw Error('Prepare and review a replacement first');payload={proposalId:p.id};review={before:p.before,after:p.after,sha256:p.sha256};}
-  staged={id:randomUUID(),step,payload,review,expires:clock()+60000};error='';emit();
+  staged={id:randomUUID(),step,payload,review,expires:clock()+60000};result=null;lastOperation={id:staged.id,action:step.action,target:step.target,state:'awaiting_local_review'};error='';emit();
  }
  async function confirm(m){
   if(busy||!session||!staged||m.sessionId!==session.id||m.id!==staged.id||clock()>=staged.expires||clock()>=session.expires)throw Error('Proposal missing or expired; discard and prepare again');
   const current=session,entry=staged,c=current.coordinator;
-  busy=true;result=null;emit();
+  busy=true;result=null;lastOperation={id:entry.id,action:entry.step.action,target:entry.step.target,state:'running'};emit();
   try{
    const task=c.prepare({kind:current.kind,scope:current.scope,steps:[entry.step]});
    grant=trust.grant({capability:CAPS[current.kind][entry.step.action],origin,scope:current.id+':'+entry.id,ttl:60000,approvedBy:'local-user'});
    if(entry.step.requiresApproval)c.approveStep(task.id,0,{...origin,approvedBy:'local-user'});
-   const completed=await c.next(task.id);
+   const completed=await c.next(task.id);lastOperation.state=completed.state;if(completed.state!=='complete')result=null;
    if(completed.state==='complete'&&plan&&entry.planIndex===plan.index){plan={...plan,index:plan.index+1};}
-  }finally{revoke();staged=null;busy=false;if(clock()>=current.expires)await close();emit();}
+  }catch(e){lastOperation.state=c.snapshot()?.state==='cancelled'?'cancelled':'failed';result=null;throw e;}finally{revoke();staged=null;busy=false;if(clock()>=current.expires)await close();emit();}
  }
  async function handle(m){
   if(handling&&m.type!=='alec_agents_cancel')return;
@@ -112,7 +112,7 @@ export function createNativeAgents({trust,origin,changed=()=>{},browserFactory=l
    else if(m.type==='alec_agents_stage_plan')stagePlan(m);
    else if(m.type==='alec_agents_clear_plan'&&!busy&&!staged)plan=null;
    else if(m.type==='alec_agents_confirm')await confirm(m);
-   else if(m.type==='alec_agents_discard'&&!busy){staged=null;result=null;}
+   else if(m.type==='alec_agents_discard'&&!busy){staged=null;result=null;if(lastOperation?.state==='awaiting_local_review')lastOperation.state='discarded';}
    else if(m.type==='alec_agents_close'&&!busy)await close();
    else if(m.type==='alec_agents_cancel'&&busy&&session){const t=session.coordinator.snapshot();if(t)session.coordinator.cancel(t.id);}
   }catch(e){error=String(e.message||e).slice(0,350);}

@@ -173,3 +173,21 @@ test('History context requires explicit opt-in and excludes tool results and ima
  const ctx=liveHistoryContext(messages,true,x=>x);assert.match(ctx,/Projeto X/);assert.match(ctx,/Vamos continuar/);assert.doesNotMatch(ctx,/SECRET|PRIVATE/);
  const ws=new Fake();const s=createLiveSession({apiKey:'x',model:'gemini-live',historyContext:ctx,socket:()=>ws});try{ws.dispatchEvent(new Event('open'));assert.match(ws.sent[0].setup.systemInstruction.parts[0].text,/Projeto X/);}finally{s.close();}
 });
+
+test('Live sends only a bounded JPEG on the existing socket and fails closed for unavailable frames',async()=>{
+ const ws=new Fake(),s=createLiveSession({apiKey:'x',model:'gemini-live',socket:()=>ws});
+ const jpg=Buffer.from([255,216,1,2,255,217]);
+ try{assert.equal(s.video(jpg),false);ws.message({setupComplete:{}});await tick();
+ assert.equal(s.video(Buffer.from('PNG')),false);assert.equal(s.video(Buffer.alloc(600000)),false);assert.equal(s.video(jpg),true);
+ assert.deepEqual(ws.sent.at(-1).realtimeInput.video,{mimeType:'image/jpeg',data:jpg.toString('base64')});assert.equal(s.audio(Buffer.alloc(2560)),true);
+ }finally{s.close();}
+});
+test('Screen vision invokes the approved native screenshot object and transfers no binary in the tool receipt',async()=>{
+ const jpg=Buffer.from([255,216,1,2,255,217]),sent=[];let approve=false,accept=true,called=0;
+ const tool={name:'take_screenshot',parameters:{safeParse:a=>({success:true,data:a})},execute:async()=>{called++;return {content:[{type:'text',text:'Native capture'},{type:'image',mediaType:'image/jpeg',data:jpg.toString('base64')}]}}};
+ const core=createLiveCore({registry:()=>[tool],confirm:async()=>approve,sendImage:bytes=>{sent.push(bytes);return accept;}});
+ const signal=new AbortController().signal;
+ await assert.rejects(core.execute('take_screenshot',{target:'front'},signal,'1'),/not_approved/);assert.equal(called,0);
+ approve=true;const receipt=await core.execute('take_screenshot',{target:'front'},signal,'2');assert.equal(receipt.imageSent,true);assert.deepEqual(sent[0],jpg);assert.doesNotMatch(JSON.stringify(receipt),new RegExp(jpg.toString('base64')));
+ accept=false;await assert.rejects(core.execute('take_screenshot',{target:'front'},signal,'3'),/image_not_sent/);
+});

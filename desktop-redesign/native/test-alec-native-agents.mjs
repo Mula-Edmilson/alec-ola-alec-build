@@ -53,3 +53,15 @@ test('model plans are imported only, bound to session scope and individually rev
  assert.equal(a.snapshot().plan.index,2);assert.equal(await fs.readFile(path.join(root,'a.js'),'utf8'),'two');assert.equal(trust.list().length,0);
  await a.handle({type:'alec_agents_close'});
 });
+
+test('Live bridge stages real developer actions but cannot confirm or write without native panel approval',async t=>{
+ const {createLiveAgentBridge}=await import('../live/transport.mjs');
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'alec-live-agent-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));
+ await fs.writeFile(path.join(root,'a.js'),'old');
+ const a=createNativeAgents({trust:createTrust(),origin});let review=0;const bridge=createLiveAgentBridge({agents:a,openReview:()=>review++});
+ const opened=await bridge.open({kind:'developer',root});const sessionId=opened.session.id;
+ const first=await bridge.stage({sessionId,action:'proposePatch',target:'a.js',value:'new'});assert.equal(first.state,'awaiting_local_review');assert.equal(review,1);assert.equal(bridge.confirm,undefined);assert.equal(bridge.status().result,null);
+ await a.handle({type:'alec_agents_confirm',sessionId,id:first.staged.id});assert.equal(bridge.status().lastOperation.state,'complete');assert.equal(await fs.readFile(path.join(root,'a.js'),'utf8'),'old');
+ const second=await bridge.stage({sessionId,action:'applyPatch',target:'a.js'});assert.equal(bridge.status().result,null);assert.equal(await fs.readFile(path.join(root,'a.js'),'utf8'),'old');
+ await a.handle({type:'alec_agents_confirm',sessionId,id:second.staged.id});assert.equal(bridge.status().lastOperation.state,'complete');assert.equal(await fs.readFile(path.join(root,'a.js'),'utf8'),'new');await bridge.close();
+});
