@@ -158,3 +158,18 @@ test('Live denies discovery and memory when grant is revoked and allows explicit
  test('native structured failures are not successful tasks, and catalog replay respects revocation',async()=>{
  let permitted=true;const tool={name:'list_files',parameters:{safeParse:a=>({success:true,data:a})},execute:async()=>({isError:true,content:[{type:'text',text:'failed'}]})};const core=createLiveCore({registry:()=>[tool],confirm:async()=>true});const actions=createLiveActions({authorize:()=>permitted,execute:async(a,signal)=>core.execute(a.tool,a.args,signal,'id'),catalog:core.catalog});try{const catalog={id:'catalog1',name:'alec_core_catalog',args:{}};assert.equal(actions.call(catalog).tools[0].name,'list_files');const task=actions.call({id:'job',name:'alec_start_task',args:{operation:'core_tool',tool:'list_files',args_json:'{}'}});await tick();await tick();assert.equal(actions.call({id:'result',name:'alec_task_status',args:{task_id:task.task_id}}).error,'native_tool_failed');permitted=false;assert.equal(actions.call(catalog).error,'permission_revoked');assert.deepEqual(actions.call({id:'all',name:'alec_task_status',args:{}}).tasks,[]);}finally{actions.close();}
 });
+
+test('Live transcripts preserve completed dialogue and discard interrupted replies and internal events',async()=>{
+ const {createLiveTranscript}=await import('./transport.mjs');const rows=[];const tr=createLiveTranscript({commit:x=>rows.push(...x)});
+ tr.event({type:'input',text:'Olá'});tr.event({type:'input',text:' Alec'});tr.event({type:'output',text:'Olá!'});tr.event({type:'turn_complete'});
+ assert.deepEqual(rows,[{role:'user',content:'Olá Alec'},{role:'assistant',content:[{type:'text',text:'Olá!'}]}]);
+ tr.typed('Abre a calculadora');tr.event({type:'output',text:'Ainda'});tr.event({type:'interrupt'});assert.equal(rows.at(-1).content,'Abre a calculadora');
+ tr.event({type:'output',text:'Evento interno'});tr.event({type:'turn_complete'});assert.equal(rows.length,3);
+ tr.typed('Pedido enviado');tr.event({type:'reconnecting'});tr.finish();assert.equal(rows.length,4);assert.equal(rows.at(-1).content,'Pedido enviado');
+});
+test('History context requires explicit opt-in and excludes tool results and images',async()=>{
+ const {liveHistoryContext}=await import('./transport.mjs');const messages=[{role:'user',content:[{type:'text',text:'Projeto X'},{type:'image',data:'PRIVATE'}]},{role:'tool',content:'SECRET'},{role:'assistant',content:[{type:'text',text:'Vamos continuar'}]}];
+ assert.equal(liveHistoryContext(messages,false),'');
+ const ctx=liveHistoryContext(messages,true,x=>x);assert.match(ctx,/Projeto X/);assert.match(ctx,/Vamos continuar/);assert.doesNotMatch(ctx,/SECRET|PRIVATE/);
+ const ws=new Fake();const s=createLiveSession({apiKey:'x',model:'gemini-live',historyContext:ctx,socket:()=>ws});try{ws.dispatchEvent(new Event('open'));assert.match(ws.sent[0].setup.systemInstruction.parts[0].text,/Projeto X/);}finally{s.close();}
+});
