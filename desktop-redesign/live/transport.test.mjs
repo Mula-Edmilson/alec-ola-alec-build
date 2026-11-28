@@ -252,3 +252,18 @@ test('Desktop Live cannot start with a missing executor and advertises tools on 
  assert.doesNotMatch(setup.systemInstruction.parts[0].text,/Neste modo apenas conversas/);
  }finally{s.close();actions.close();}
 });
+
+test('Unified Live delegates every ordinary tool to its native policy without a duplicate confirmation',async()=>{
+ let allow=true,skip=true,prompts=0,wrapperPrompts=0;const invocations=[];
+ const params={safeParse:data=>({success:true,data})};
+ const registry=[{name:'list_files',parameters:params,execute:async()=>['project']},{name:'run_command',parameters:params,execute:async()=>{if(!allow)throw Error('actions_off');if(!skip)prompts++;return 'command returned';}},{name:'connection_tools',parameters:params,execute:async()=>({tools:[]})},{name:'alec_webcam_capture',parameters:params,execute:async()=>({content:[{type:'image',mediaType:'image/jpeg',data:'/9gBAv/Z'}]})}];
+ const core=createLiveCore({registry:()=>registry,nativePolicy:true,actionsAllowed:()=>allow,skipAllow:()=>allow&&skip,confirm:async()=>{wrapperPrompts++;return true;},sendImage:()=>true,invoke:async(t,args,ctx)=>{invocations.push(t.name);return t.execute(args,ctx);}});
+ const signal=new AbortController().signal;
+ assert.deepEqual(core.catalog().tools.map(t=>t.name),registry.map(t=>t.name));
+ await core.execute('list_files',{},signal,'1');await core.execute('run_command',{},signal,'2');await core.execute('connection_tools',{},signal,'3');await core.execute('alec_webcam_capture',{},signal,'4');
+ assert.equal(wrapperPrompts,0);assert.equal(prompts,0);
+ skip=false;await core.execute('run_command',{},signal,'5');assert.equal(prompts,1);assert.equal(wrapperPrompts,0);
+ await core.execute('alec_webcam_capture',{},signal,'6');assert.equal(wrapperPrompts,1);
+ allow=false;await assert.rejects(core.execute('run_command',{},signal,'7'),/actions_off/);assert.equal(wrapperPrompts,1);
+ assert.equal(invocations.length,7);
+});

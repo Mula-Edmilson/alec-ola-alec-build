@@ -89,7 +89,7 @@
    source.onended=()=>{s.playing.delete(source);if(active===s)drain(s);};
   }}catch{cleanup(s,true,'playback_failed');}
  }
- function animate(){requestAnimationFrame(animate);const s=active;if(!s)return;let mode=s.ready?'listen':'think',level=s.mic||0;
+ function animate(){requestAnimationFrame(animate);const s=active;if(!s)return;let mode=s.ready?(s.running?'execute':s.thinking?'think':'listen'):'think',level=s.mic||0;
   if(s.playing.size&&s.analyser){const buf=new Float32Array(s.analyser.fftSize);s.analyser.getFloatTimeDomainData(buf);let sum=0;for(const x of buf)sum+=x*x;level=Math.min(1,Math.sqrt(sum/buf.length)*5);mode='talk';}
   visual(s,mode,level);
  }
@@ -109,10 +109,13 @@
   if(event.type==='pong'){s.lastPong=performance.now();return;}
   if(event.type==='camera_request'){void camera(s,event.request);return;}
   if(event.type==='camera_cancel'){cancelCamera(s,event.request);return;}
-  if(event.type==='ready'){s.ready=true;visual(s,'listen');}
+  if(event.type==='ready'){s.ready=true;s.thinking=false;visual(s,'listen');}
+  else if(event.type==='activity'){s.running=event.running===true;if(!s.running)s.thinking=true;}
+  else if(event.type==='thinking'){s.thinking=true;}
+  else if(event.type==='turn_complete'){s.thinking=false;}
   else if(event.type==='context_reset'){R.alecLiveStatus?.('context_reset');}
   else if(event.type==='audio'){try{playback(s,event.pcm);}catch{cleanup(s,true,'playback_failed');}}
-  else if(event.type==='interrupt'){flush(s);visual(s,'listen',s.mic);}
+  else if(event.type==='interrupt'){flush(s);s.thinking=false;visual(s,s.running?'execute':'listen',s.mic);}
    else if(event.type==='reconnecting'){cancelCamera(s);s.ready=false;s.frames=[];visual(s,'think');}
   else if(event.type==='closed'){cleanup(s,false,typeof event.reason==='string'?event.reason:'connection_closed');}
  };

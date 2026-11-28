@@ -1,5 +1,27 @@
 [
   {
+    "version": "0.4.4",
+    "title": "Unified Core Architecture",
+    "date": null,
+    "items": [
+      {
+        "kind": "fixed",
+        "title": "Permissões e catálogo partilhados",
+        "text": "O Live usa a mesma selecção de ferramentas e as verificações nativas do modo normal, sem confirmação adicional. A opção de dispensar confirmações também se aplica às extensões Live."
+      },
+      {
+        "kind": "fixed",
+        "title": "Feedback de actividade",
+        "text": "Eventos reais de início e fim das ferramentas alimentam o mesmo painel de actividade e estado da Orb."
+      },
+      {
+        "kind": "improved",
+        "title": "Planos sem confirmação duplicada",
+        "text": "As etapas são validadas e seguem a política nativa; sem revisão redundante do plano."
+      }
+    ]
+  },
+  {
     "version": "0.4.3",
     "title": "Unified Live Activation",
     "date": null,

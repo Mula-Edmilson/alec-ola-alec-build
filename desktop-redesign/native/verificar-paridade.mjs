@@ -75,7 +75,7 @@ assert.ok(source.includes('verifyFreeModel(s,raw)')&&source.includes('if(singleM
 assert.equal(after(core+'alec-proactive.mjs'),readFileSync(new URL('./alec-proactive.mjs',import.meta.url),'utf8').replace(/\r\n/g,'\n'),'Proactive module integrity mismatch');
 assert.ok(source.includes('alecProactive.tick()')&&source.includes('alec_proactive_settings'),'Proactive native integration missing');
 assert.equal(after(core+'alec-adaptive-memory.mjs'),readFileSync(new URL('./alec-adaptive-memory.mjs',import.meta.url),'utf8').replace(/\r\n/g,'\n'),'Adaptive memory module integrity mismatch');
-assert.ok(source.includes('tools: textChat ? [] : tools.filter(t=>!t.name.startsWith(\'alec_agent_\')&&t.name!==\'alec_webcam_capture\'&&(!config.lite||LITE_TOOLS.has(t.name))&&(!SIGMA_TOOL_NAMES.has(t.name)||alecSigma.available()))'),'Native tool availability and Sigma security gates must remain intact');
+assert.ok(source.includes('tools: textChat ? [] : alecSharedTools()')&&source.includes("tools.filter(t=>!t.name.startsWith('alec_agent_')&&t.name!=='alec_webcam_capture'&&(!config.lite||LITE_TOOLS.has(t.name))&&(!SIGMA_TOOL_NAMES.has(t.name)||alecSigma.available()))"),'Native tool availability and Sigma security gates must remain intact');
 assert.equal(after(core+'alec-sigma-vision.mjs'),readFileSync(new URL('./alec-sigma-vision.mjs',import.meta.url),'utf8').replace(/\r\n/g,'\n'),'Sigma module integrity mismatch');
 assert.ok(source.includes('const textChat = alecConversationOnly(config.provider,m);'),'Text-only gate missing');
 assert.ok(source.includes('const alecConversationOnly = (provider, model) => provider === \'local\''),'Text-only gating must be restricted to local-compatible models');
