@@ -121,7 +121,7 @@ test('Unified core catalog and execution use the actual registered object, with 
  const signal=new AbortController().signal;
  assert.equal(core.catalog().tools[0].name,'open');assert.equal(core.catalog('unregistered_admin').error,'tool_unavailable');
  await assert.rejects(core.execute('open',{target:'Photoshop'},signal,'x'),/not_approved/);
- approved=true;assert.equal((await core.execute('open',{target:'Photoshop'},signal,'x')).output,'Opened Photoshop');assert.equal(invoked.length,1);assert.match(seen.args,/Photoshop/);
+ approved=true;const opening=await core.execute('open',{target:'Photoshop'},signal,'x');assert.equal(opening.status,'launch_requested');assert.equal(opening.windowVerified,false);assert.equal(invoked.length,1);assert.match(seen.args,/Photoshop/);
  allow=false;await assert.rejects(core.execute('open',{target:'Chrome'},signal,'y'),/native_actions_disabled/);assert.equal(invoked.length,1);
 });
 test('Live core tasks acknowledge immediately, retain typed args and query authorized memory',async()=>{
@@ -153,4 +153,8 @@ test('Live denies discovery and memory when grant is revoked and allows explicit
  const {createLiveContext}=await import('./transport.mjs');let cloud=false;const context=createLiveContext({cloudAllowed:()=>cloud,facts:()=>['Projecto Lirandzo','Preferência português'],skills:()=>[{slug:'sigma',name:'Sigma',description:'File search',path:'private-path'}],adaptive:()=> 'approved context'});
  const actions=createLiveActions({authorize:()=>true,execute:async()=>({}),memory:context.memory,skills:context.skillsList});
  try{const ask=(id,name,args)=>actions.call({id,name,args});assert.equal(ask('m1','alec_core_memory',{query:'Lirandzo'}).reason,'cloud_memory_disabled');cloud=true;assert.deepEqual(ask('m2','alec_core_memory',{query:'Lirandzo'}).configured_facts,['Projecto Lirandzo']);const inv=ask('s1','alec_core_skills',{});assert.equal(inv.skills[0].name,'Sigma');assert.equal(inv.skills[0].path,undefined);assert.equal(ask('s1','alec_core_skills',{}).error,'request_context_again');}finally{actions.close();}
+});
+
+ test('native structured failures are not successful tasks, and catalog replay respects revocation',async()=>{
+ let permitted=true;const tool={name:'list_files',parameters:{safeParse:a=>({success:true,data:a})},execute:async()=>({isError:true,content:[{type:'text',text:'failed'}]})};const core=createLiveCore({registry:()=>[tool],confirm:async()=>true});const actions=createLiveActions({authorize:()=>permitted,execute:async(a,signal)=>core.execute(a.tool,a.args,signal,'id'),catalog:core.catalog});try{const catalog={id:'catalog1',name:'alec_core_catalog',args:{}};assert.equal(actions.call(catalog).tools[0].name,'list_files');const task=actions.call({id:'job',name:'alec_start_task',args:{operation:'core_tool',tool:'list_files',args_json:'{}'}});await tick();await tick();assert.equal(actions.call({id:'result',name:'alec_task_status',args:{task_id:task.task_id}}).error,'native_tool_failed');permitted=false;assert.equal(actions.call(catalog).error,'permission_revoked');assert.deepEqual(actions.call({id:'all',name:'alec_task_status',args:{}}).tasks,[]);}finally{actions.close();}
 });
