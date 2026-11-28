@@ -240,3 +240,15 @@ test('Closing Live retains the plan activity guard until the actual native opera
  a.call({id:'p',name:'alec_start_task',args:{operation:'plan',plan_json:JSON.stringify({goal:'Write',steps:[{operation:'core_tool',tool:'write_file',args:{path:'report.txt',content:'data'}}]})}});
  await tick();assert.deepEqual(activity,[true]);a.close();assert.deepEqual(activity,[true]);finish({status:'file_verified',fileVerified:true});await tick();assert.deepEqual(activity,[true,false]);
 });
+
+test('Desktop Live cannot start with a missing executor and advertises tools on the same session',()=>{
+ const socket=new Fake();
+ assert.throws(()=>createResilientLiveSession({apiKey:'x',model:'gemini-live',requireActions:true,socket:()=>socket}),/desktop_live_executor_required/);
+ const actions=createLiveActions({authorize:()=>true,execute:async()=>({ok:true})});
+ const s=createResilientLiveSession({apiKey:'x',model:'gemini-live',requireActions:true,actions,socket:()=>socket});
+ try{socket.dispatchEvent(new Event('open'));const setup=socket.sent[0].setup;
+ assert.ok(setup.tools[0].functionDeclarations.some(d=>d.name==='alec_start_task'));
+ assert.ok(setup.tools[0].functionDeclarations.some(d=>d.name==='alec_core_memory'));
+ assert.doesNotMatch(setup.systemInstruction.parts[0].text,/Neste modo apenas conversas/);
+ }finally{s.close();actions.close();}
+});

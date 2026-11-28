@@ -25,3 +25,12 @@ assert.match(shell,/alec_native_live_camera_result/);
 assert.match(side,/alecLiveCameraPending/);
 assert.match(side,/createLiveTranscript\(\{commit:alecLiveRecord\}\)/);
 console.log('ALEC Live native wiring and hotkey routing structural assertions passed');
+
+assert.match(side,/async function alecStartLive\(withActions\)\{\s*if\(withActions!==true\)/);
+assert.doesNotMatch(side,/alecStartLive\(\s*\)/);
+assert.match(side,/createResilientLiveSession\(\{[^\n]+requireActions:true,actions:alecLiveActions/);
+assert.match(side,/if\(m\.alecLocalPanel===true&&!alecContext\.getStore\(\)\)void alecStartLive\(true\)/);
+assert.match(panel,/btn\('Activar Live',\(\)=>alecConfirm\([^\n]+send\(\{type:'alec_live_actions_start'\}\)/);
+assert.doesNotMatch(panel,/btn\('Live \+ tarefas'/);
+assert.doesNotMatch(panel,/\?\s*'alec_live_stop'\s*:\s*'alec_live_start'/);
+console.log('Desktop Live has exactly one authorised activation path; no conversation-only desktop fallback');

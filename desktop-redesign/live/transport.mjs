@@ -83,7 +83,8 @@ export function createLiveSession({apiKey,model,voice='Charon',socket=url=>new W
 
 // Native-only recovery. Keep the logical session and its Orb alive across sockets.
 // Never persist the resumption handle or send it to the renderer.
-export function createResilientLiveSession({emit=()=>{},onClose=()=>{},retryDelay=1000,stableMs=30000,...opts}){
+export function createResilientLiveSession({requireActions=false,emit=()=>{},onClose=()=>{},retryDelay=1000,stableMs=30000,...opts}){
+ if(requireActions&&(!opts.actions||typeof opts.actions.call!=='function'||typeof opts.actions.cancelCalls!=='function'))throw Error('desktop_live_executor_required');
  let current=null,handle=null,closed=false,state='connecting',timer=null,stableTimer=null,renewTimer=null,epoch=0,everReady=false,attempts=0,goAway=false;
  const clearTimers=()=>{clearTimeout(timer);clearTimeout(stableTimer);clearTimeout(renewTimer);timer=stableTimer=renewTimer=null;};
  function finish(reason='stopped'){if(closed)return;closed=true;state='closed';++epoch;clearTimers();const s=current;current=null;handle=null;s?.close(reason);emit({type:'closed',reason});onClose(reason);}

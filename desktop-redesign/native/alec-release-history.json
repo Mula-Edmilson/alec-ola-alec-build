@@ -1,5 +1,22 @@
 [
   {
+    "version": "0.4.3",
+    "title": "Unified Live Activation",
+    "date": null,
+    "items": [
+      {
+        "kind": "fixed",
+        "title": "Uma única sessão Live",
+        "text": "Eliminado o botão que iniciava Gemini apenas em conversação. Activar Live liga o executor nativo mediante autorização local."
+      },
+      {
+        "kind": "fixed",
+        "title": "Validação da ligação",
+        "text": "O arranque Desktop recusa sessão sem executor e a interface identifica o estado da ligação às ferramentas."
+      }
+    ]
+  },
+  {
     "version": "0.4.2",
     "title": "Autonomous Task Intelligence",
     "date": null,

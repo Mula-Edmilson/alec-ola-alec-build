@@ -85,6 +85,14 @@ try{
      assert.deepEqual(errors,[],'JavaScript errors in '+route);
     }catch(e){await page.screenshot({path:path.join(dest,'failure-'+route+'-'+width+'.png')}).catch(()=>{});failures.push({viewport:[width,height],scenario:route,message:e.message,errors:[...errors]});console.error(route+' '+width+'x'+height+': '+e.message);}
    }
+   await open('tab=listening');
+   const startLive=page.locator('[data-k="alec-live-actions"]');
+   assert.equal(await startLive.count(),1,'Exactly one Live start button');
+   assert.equal((await startLive.textContent()).trim(),'Activar Live');
+   assert.equal(await page.getByText('Live + tarefas',{exact:true}).count(),0);
+   const liveMessages=[];const observe=msg=>{if(msg.text().includes('[preview] would send')&&msg.text().includes('alec_live_actions_start'))liveMessages.push(msg.text());};page.on('console',observe);
+   await startLive.click();await page.locator('[data-k="alec-dialog-cancel"]').click();await page.locator('#alec-confirm-dialog').waitFor({state:'detached'});assert.equal(liveMessages.length,0,'Cancel must not start Live');
+   await startLive.click();await page.locator('[data-k="alec-dialog-accept"]').click();await page.locator('#alec-confirm-dialog').waitFor({state:'detached'});assert.equal(liveMessages.length,1,'Approved UI starts executor-enabled Live');page.off('console',observe);
    await open('tab=model');
    for(const tab of ['default','hybrid','crew','backups','accounts']){
     const button=page.locator('#tab-'+tab);if(!await button.count())continue;
