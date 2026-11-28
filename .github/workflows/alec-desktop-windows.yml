@@ -93,6 +93,10 @@ jobs:
           node dist/sidekick.mjs --alec-conversation-self-test > conversation-bundle-test.json
           node -e "const r=require('./conversation-bundle-test.json');if(r.engine!=='ALEC_CONVERSATION_V036'||r.ok!==true)process.exit(1)"
           rm conversation-bundle-test.json
+      - name: Exercise real native tools through Live with common permission settings
+        if: github.ref_name == 'alec-autonomous-042'
+        shell: bash
+        run: node desktop-redesign/native/testar-live-core-real.mjs upstream
       - name: Run every sidecar regression test and report all failures
         shell: bash
         run: node desktop-redesign/native/executar-testes.mjs upstream/showcase/tauri/sidecar/test
