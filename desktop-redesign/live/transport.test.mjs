@@ -234,3 +234,9 @@ test('Independent write proof uses real native readback, not a success string',a
  const s=new AbortController().signal;
  assert.equal((await core.execute('write_file',{path:'report.txt',content:'data'},s,'w')).fileVerified,true);matches=false;assert.equal((await core.execute('write_file',{path:'report.txt',content:'data'},s,'x')).fileVerified,false);
 });
+
+test('Closing Live retains the plan activity guard until the actual native operation settles',async()=>{
+ let finish;const activity=[];const a=createLiveActions({authorize:()=>true,validateStep:()=>true,reviewPlan:async()=>true,planActivity:v=>activity.push(v),execute:()=>new Promise(r=>{finish=r;})});
+ a.call({id:'p',name:'alec_start_task',args:{operation:'plan',plan_json:JSON.stringify({goal:'Write',steps:[{operation:'core_tool',tool:'write_file',args:{path:'report.txt',content:'data'}}]})}});
+ await tick();assert.deepEqual(activity,[true]);a.close();assert.deepEqual(activity,[true]);finish({status:'file_verified',fileVerified:true});await tick();assert.deepEqual(activity,[true,false]);
+});

@@ -211,14 +211,14 @@ export async function executeUniversalPlan(plan,{signal,authorize,validateStep,r
   const verified=s.operation==='open_app'?value?.status==='window_verified'&&value?.windowVerified===true:s.tool==='write_file'?value?.status==='file_verified'&&value?.fileVerified===true:false;
   // Results are bounded data, not instructions. Avoid claiming a proof from text.
   const output=typeof value?.output==='string'?value.output:JSON.stringify(value??null);
-  receipts.push({...active,state:write?(verified?'verified':'effect_unknown'):'read_returned',output:String(output??'').slice(0,2200),...(verified?{evidence:s.operation==='open_app'?'native_window_check':'native_file_readback'}:{})});
+  receipts.push({...active,state:write?(verified?'verified':'effect_unknown'):'read_returned',output:Buffer.from(String(output??'')).subarray(0,2200).toString('utf8'),...(verified?{evidence:s.operation==='open_app'?'native_window_check':'native_file_readback'}:{})});
   progress({index:i+1,total:plan.steps.length,tool:label,phase:receipts.at(-1).state});
   if(write&&!verified)return result('needs_review','effect_not_verified');
  }
  return result('complete');
 }
 
-export function createLiveActions({authorize,execute,validateStep=()=>false,reviewPlan=async()=>false,catalog=()=>({tools:[]}),memory=()=>({available:false}),skills=()=>({skills:[]}),onResultRead=()=>{},changed=()=>{},schedule=setImmediate,idFactory=(()=>{let n=0;return()=>String(++n);})()}={}){
+export function createLiveActions({authorize,execute,validateStep=()=>false,reviewPlan=async()=>false,planActivity=()=>{},catalog=()=>({tools:[]}),memory=()=>({available:false}),skills=()=>({skills:[]}),onResultRead=()=>{},changed=()=>{},schedule=setImmediate,idFactory=(()=>{let n=0;return()=>String(++n);})()}={}){
  if(typeof authorize!=='function'||typeof execute!=='function')throw Error('Live task policy missing');
  const tasks=new Map(),calls=new Map();let stopped=false,running=false,scheduled=false;
  const terminal=t=>['complete','failed','cancelled','denied'].includes(t.state);
@@ -259,7 +259,7 @@ export function createLiveActions({authorize,execute,validateStep=()=>false,revi
    if(!permitted(t.operation)){t.state='denied';t.error='permission_revoked';return;}
    t.state='running';notify();
    if(t.operation==='plan'){
-    const result=await executeUniversalPlan(t.args.plan,{signal:t.controller.signal,authorize:permitted,validateStep,reviewPlan,execute,progress:p=>{t.progress=p;notify();}});
+    let result;planActivity(true);try{result=await executeUniversalPlan(t.args.plan,{signal:t.controller.signal,authorize:permitted,validateStep,reviewPlan,execute,progress:p=>{t.progress=p;notify();}});}finally{planActivity(false);}
     if(stopped)return;
     if(!permitted('plan')){t.state='denied';t.error='permission_revoked';return;}
     t.result=result;t.state=result.status==='complete'?'complete':result.status==='cancelled'?'cancelled':result.status==='denied'?'denied':'failed';t.error=result.error;return;
