@@ -148,3 +148,9 @@ test('Live denies discovery and memory when grant is revoked and allows explicit
  const status=(id,task)=>actions.call({id,name:'alec_task_status',args:{task_id:task}});
  try{const a=start('launch1');await tick();await tick();const failed=status('proof1',a.task_id);assert.equal(failed.state,'failed');assert.equal(failed.error,'window_not_verified');assert.equal(start('launch1').task_id,a.task_id);assert.equal(count,1);const b=start('launch2');assert.notEqual(b.task_id,a.task_id);await tick();await tick();assert.equal(status('proof2',b.task_id).result.windowVerified,true);assert.equal(count,2);}finally{actions.close();}
 });
+
+ test('Live context discovers installed skills and shares configured facts only with explicit cloud permission',async()=>{
+ const {createLiveContext}=await import('./transport.mjs');let cloud=false;const context=createLiveContext({cloudAllowed:()=>cloud,facts:()=>['Projecto Lirandzo','Preferência português'],skills:()=>[{slug:'sigma',name:'Sigma',description:'File search',path:'private-path'}],adaptive:()=> 'approved context'});
+ const actions=createLiveActions({authorize:()=>true,execute:async()=>({}),memory:context.memory,skills:context.skillsList});
+ try{const ask=(id,name,args)=>actions.call({id,name,args});assert.equal(ask('m1','alec_core_memory',{query:'Lirandzo'}).reason,'cloud_memory_disabled');cloud=true;assert.deepEqual(ask('m2','alec_core_memory',{query:'Lirandzo'}).configured_facts,['Projecto Lirandzo']);const inv=ask('s1','alec_core_skills',{});assert.equal(inv.skills[0].name,'Sigma');assert.equal(inv.skills[0].path,undefined);assert.equal(ask('s1','alec_core_skills',{}).error,'request_context_again');}finally{actions.close();}
+});
